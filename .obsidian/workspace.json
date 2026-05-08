@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "lessons/intro/world-view.md",
+                "file": "lessons/part-3/3-6-async-thinking.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "world-view"
+              "title": "3-6-async-thinking"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "lessons/intro/world-view.md",
+                "file": "lessons/part-3/3-6-async-thinking.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "world-view 的反向連結"
+              "title": "3-6-async-thinking 的反向連結"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "lessons/intro/world-view.md",
+                "file": "lessons/part-3/3-6-async-thinking.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "world-view 的對外連結"
+              "title": "3-6-async-thinking 的對外連結"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "lessons/intro/world-view.md",
+                "file": "lessons/part-3/3-6-async-thinking.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "world-view 的大綱"
+              "title": "3-6-async-thinking 的大綱"
             }
           }
         ]
@@ -185,21 +185,46 @@
   },
   "active": "589ae9d15ab20981",
   "lastOpenFiles": [
-    "lessons/intro/images/0-7-docker-k8s.svg",
-    "lessons/intro/images/0-6-microservices.svg",
-    "lessons/intro/images/0-3-database.svg",
-    "lessons/intro/images/0-5-cdn.svg",
-    "lessons/intro/images/0-4-load-balancer.svg",
-    "lessons/intro/images/0-2-restaurant.svg",
-    "lessons/intro/images/0-1-food-truck.svg",
-    "lessons/intro/images",
-    "課程大綱.md",
-    "lessons/intro/world-view_TODO.md",
-    "lessons/intro/world-view.md",
-    "lessons/intro",
-    "lessons/part-1/1-1-from-food-stall-to-chain-restaurant_TODO.md",
+    "lessons/part-3/3-5-event-driven.md",
+    "lessons/part-3/3-4-dom-manipulation.md",
+    "lessons/part-3/3-3-css-basics.md",
+    "lessons/part-3/3-2-html-and-dom.md",
+    "lessons/part-3/3-1-how-browser-works.md",
+    "lessons/part-3/3-6-async-thinking.md",
+    "課外讀物/E-3-network/E-3-3-http-protocol.md",
     "lessons/part-0/0-1-dev-environment-overview.md",
-    "CLAUDE.md",
+    "課外讀物/E-3-network/E-3-1-how-internet-works.md",
+    "lessons/part-0/0-5-git-basics.md",
+    "lessons/part-0/0-6-github-intro.md",
+    "lessons/intro/world-view.md",
+    "lessons/intro/images/0-1-food-truck.jpeg",
+    "lessons/part-2/2-1-js-vs-ts.md",
+    "lessons/part-2/2-8-utility-types.md",
+    "lessons/part-2/2-9-cli-todo.md",
+    "課外讀物/E-7-solid/E-7-5-isp.md",
+    "課外讀物/E-7-solid/E-7-2-srp.md",
+    "課外讀物/E-7-solid/E-7-1-solid-overview.md",
+    "課外讀物/E-6-best-practices/E-6-4-typescript-best-practices.md",
+    "lessons/part-2/2-6-generics.md",
+    "課外讀物/E-6-best-practices/E-6-3-function-design.md",
+    "課外讀物/E-6-best-practices/E-6-2-naming.md",
+    "lessons/part-2/2-5-functions.md",
+    "lessons/part-2/2-3-compound-types.md",
+    "lessons/part-2/2-7-modules.md",
+    "lessons/part-2/2-2-basic-types.md",
+    "lessons/intro/images/0-2-restaurant.jpeg",
+    "lessons/intro/images/0-2-restaurant.peg",
+    "lessons/intro/images/0-4-load-balancer.jpeg",
+    "lessons/intro/images/0-2-restaurant1.peg",
+    "lessons/intro/images/0-7-docker-k8s.jpeg",
+    "lessons/intro/images/0-6-microservices.jpeg",
+    "lessons/intro/images/0-5-cdn.jpeg",
+    "lessons/intro/images/0-3-database.jpeg",
+    "lessons/intro/images/0-2-restaurant..jpeg",
+    "lessons/intro/images/7.jpeg",
+    "lessons/intro/images/6.jpeg",
+    "lessons/intro/images",
+    "lessons/intro",
     "課外讀物/E-13-scaling",
     "poc/v8",
     "課外讀物/E-12-design-patterns",
