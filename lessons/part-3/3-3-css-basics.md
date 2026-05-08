@@ -263,13 +263,13 @@ h1 {
 }
 
 /* 輸入區域：用 Flexbox 讓輸入框和按鈕排成一排 */
-.input-row {
+.input-area {
   display: flex;
   gap: 8px; /* 子元素之間的間距，比 margin 更方便 */
   margin-bottom: 20px;
 }
 
-.input-row input {
+.input-area input {
   flex: 1; /* 讓輸入框佔滿剩餘空間，按鈕維持固定寬度 */
   padding: 10px 14px;
   border: 1px solid #ddd;
@@ -278,11 +278,11 @@ h1 {
   outline: none; /* 移除預設的藍色外框 */
 }
 
-.input-row input:focus {
+.input-area input:focus {
   border-color: #4a90d9; /* 輸入框被點擊時，邊框改成藍色，提示使用者 */
 }
 
-.input-row button {
+.input-area button {
   padding: 10px 20px;
   background-color: #4a90d9;
   color: #ffffff;
@@ -292,7 +292,7 @@ h1 {
   cursor: pointer; /* 滑鼠移過去會變成手指圖示 */
 }
 
-.input-row button:hover {
+.input-area button:hover {
   background-color: #357abd; /* hover 時顏色稍微變深，給使用者反饋 */
 }
 
@@ -341,6 +341,6 @@ Flexbox 最常見的用途之一是「水平 + 垂直同時置中」，寫法固
 
 **練習 1**：在你的 Todo App 裡加上一個「空狀態」提示。當清單是空的時，在 `<ul>` 裡面加一行 `<p class="empty-hint">還沒有任何待辦事項</p>`，然後用 CSS 讓這行字顯示為灰色（`color: #999`）、斜體（`font-style: italic`）、水平置中（`text-align: center`）。
 
-**練習 2**：修改 `.input-row button` 的樣式，讓按鈕的背景色從藍色改成你喜歡的顏色。然後用 `border-radius: 999px` 把它改成膠囊形狀（完全圓角），觀察效果。
+**練習 2**：修改 `.input-area button` 的樣式，讓按鈕的背景色從藍色改成你喜歡的顏色。然後用 `border-radius: 999px` 把它改成膠囊形狀（完全圓角），觀察效果。
 
 **練習 3**：在 `#todo-list li` 加上 `display: flex` 和 `justify-content: space-between`，然後在每個 `<li>` 裡加一個 `<span>刪除</span>`，讓「待辦文字」和「刪除」分別貼在左右兩端。（還不用讓按鈕真的能刪除——那是下一章的事。）
