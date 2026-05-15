@@ -55,6 +55,7 @@ pbcopy < ~/.ssh/id_ed25519_personal.pub
 ```
 
 接著：
+
 1. 登入你要設定的 **GitHub 帳號**。
 2. 點擊右上角頭像，選擇 **Settings**。
 3. 在左側選單點選 **SSH and GPG keys**。
