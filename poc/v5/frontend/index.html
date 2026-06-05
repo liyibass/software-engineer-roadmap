@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Todo App — POC V5</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📝 我的待辦清單</h1>
+      <p class="subtitle">POC V5 — 分層架構 + 登入</p>
+
+      <!-- 登入 / 註冊區 -->
+      <section id="auth-section" class="card">
+        <h2>登入 / 註冊</h2>
+        <div class="form-group">
+          <label for="email-input">Email</label>
+          <input type="email" id="email-input" placeholder="you@example.com" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="password-input">密碼</label>
+          <input type="password" id="password-input" placeholder="••••••" autocomplete="current-password" />
+        </div>
+        <div class="button-row">
+          <button id="login-btn">登入</button>
+          <button id="register-btn" class="secondary">註冊新帳號</button>
+        </div>
+        <p id="auth-error" class="error"></p>
+        <p class="hint">提示：第一個註冊的帳號會是管理員（admin），能看到所有人的待辦。</p>
+      </section>
+
+      <!-- 登入後的待辦區（預設隱藏） -->
+      <section id="app-section">
+        <div class="topbar">
+          <span id="whoami" class="whoami"></span>
+          <button id="logout-btn" class="link-btn">登出</button>
+        </div>
+
+        <div class="input-row">
+          <input type="text" id="todo-input" placeholder="今天要做什麼？" autocomplete="off" />
+          <button id="add-btn">新增</button>
+        </div>
+
+        <ul id="todo-list"></ul>
+        <p id="empty-hint" class="empty-hint">還沒有待辦事項，新增一個吧！</p>
+      </section>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

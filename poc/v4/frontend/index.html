@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Todo App — POC V4</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📝 我的待辦清單</h1>
+      <p class="subtitle">POC V4 — Vite + 共用型別 + 環境變數</p>
+
+      <div class="input-row">
+        <input
+          type="text"
+          id="todo-input"
+          placeholder="今天要做什麼？"
+          autocomplete="off"
+        />
+        <button id="add-btn">新增</button>
+      </div>
+
+      <ul id="todo-list"></ul>
+      <p id="empty-hint" class="empty-hint">還沒有待辦事項，新增一個吧！</p>
+    </div>
+
+    <!-- Vite 入口：直接指向 .ts 原始碼，Vite 在背後即時編譯，不用手動 build -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

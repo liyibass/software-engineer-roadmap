@@ -1,0 +1,16 @@
+{
+  "name": "todo-frontend-v5",
+  "version": "5.0.0",
+  "description": "POC V5 前端 —— 登入頁 + 帶 token 的請求",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

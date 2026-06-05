@@ -1,0 +1,6 @@
+node_modules/
+dist/
+
+# 環境變數檔，內含設定與機密（JWT_SECRET！），絕不進版本控制
+.env
+.env.local
