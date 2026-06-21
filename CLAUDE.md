@@ -10,13 +10,18 @@
 programming-tutorial/
 ├── 課程大綱.md          # 總覽，不放實際教學內容
 ├── CLAUDE.md
-├── lessons/
-│   ├── part-0/
-│   │   ├── 0-1-xxx.md
+├── lessons/             # 多套課程（「多本書」），一個子資料夾一套
+│   ├── basic/           # 基礎程式學習（原本的主線課程）
+│   │   ├── intro/
+│   │   ├── part-0/
+│   │   │   ├── 0-1-xxx.md
+│   │   │   └── ...
+│   │   ├── part-1/
 │   │   └── ...
-│   ├── part-1/
-│   └── ...
-├── 課外讀物/
+│   ├── aws/             # AWS 系列
+│   ├── infra/           # Infra 系列
+│   └── ...              # 未來可再新增其他主題
+├── 課外讀物/             # 跨課程共用的延伸閱讀（E-1 ~ E-13）
 │   ├── E-1-terminal/
 │   ├── E-2-npm/
 │   ├── E-3-network/
@@ -27,6 +32,8 @@ programming-tutorial/
     ├── v2/
     └── ...
 ```
+
+> **課程分類說明**：`lessons/` 底下每個子資料夾是一套獨立課程（像一本書）。`basic/` 是原本的基礎程式課；`aws/`、`infra/` 為後續主題。`課外讀物/` 是所有課程共用的通用知識庫，固定放在頂層。
 
 ---
 
@@ -126,21 +133,23 @@ Mermaid node label 裡換行一律用 `<br/>`，**不用 `\n`**（`\n` 在多數
 
 ### 路徑規則
 
-所有主線章節位於 `lessons/part-X/filename.md`（距離根目錄兩層），課外讀物位於 `課外讀物/E-X-xxx/filename.md`，因此：
+所有課程章節位於 `lessons/{課程}/part-X/filename.md`（例如 `lessons/basic/part-4/...`，距離根目錄三層），課外讀物位於 `課外讀物/E-X-xxx/filename.md`，因此：
 
-- **主線章節 → 課外讀物**：路徑固定為 `../../課外讀物/E-X-xxx/filename.md`
+- **課程章節 → 課外讀物**：路徑固定為 `../../../課外讀物/E-X-xxx/filename.md`（三層 `../`）
 - **課外讀物 → 同系列其他章節**：`./filename.md`
 - **課外讀物 → 其他系列**：`../E-X-xxx/filename.md`
+
+> ⚠️ 注意：課程章節從原本的 `lessons/part-X/` 改為分類在 `lessons/{課程}/part-X/`（多一層），所以引用課外讀物從 `../../` 改為 `../../../`。
 
 ### 引用格式
 
 ```markdown
-> 想深入了解 XXX → [課外讀物 E-X-X：完整標題](../../課外讀物/E-X-xxx/E-X-X-filename.md)
+> 想深入了解 XXX → [課外讀物 E-X-X：完整標題](../../../課外讀物/E-X-xxx/E-X-X-filename.md)
 ```
 
 例如：
 ```markdown
-> 好奇瀏覽器輸入網址後發生什麼事 → [課外讀物 E-3-1：網際網路是怎麼運作的？](../../課外讀物/E-3-network/E-3-1-how-internet-works.md)
+> 好奇瀏覽器輸入網址後發生什麼事 → [課外讀物 E-3-1：網際網路是怎麼運作的？](../../../課外讀物/E-3-network/E-3-1-how-internet-works.md)
 ```
 
 課外讀物章節末尾引導其他課外讀物：

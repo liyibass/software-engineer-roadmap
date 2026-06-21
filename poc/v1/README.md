@@ -41,7 +41,7 @@ V1 架構：
 
 這正是 **V2 要引入「後端」的理由**：把資料從「單一台瀏覽器」搬到「一台大家都連得到的伺服器」上。
 
-> 這個限制會在 [Part 4-A：HTTP / Express / fetch](../../lessons/part-4/4-A-1-what-is-http.md) 開始解決。
+> 這個限制會在 [Part 4-A：HTTP / Express / fetch](../../lessons/basic/part-4/4-A-1-what-is-http.md) 開始解決。
 
 ---
 
