@@ -144,17 +144,78 @@ for i in {1..50}; do curl -s http://localhost:3000/some-failing-endpoint > /dev/
 
 在你的環境，讓應用輸出指標、讓 Prometheus 抓到、在 Grafana 建出「流量 / 錯誤率 / 延遲 p95 / 飽和度」四個面板。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，成功的樣子與關鍵檢查點如下（照本章五步驟做即可）：
+
+1. **應用輸出指標**：用 `prom-client` 加入一個 Counter（`http_requests_total`，標籤 `method/status/path`）和一個 Histogram（`http_request_duration_seconds`，設好 `buckets`），並開一個 `/metrics` 端點把指標攤開。**驗收**：瀏覽器打開 `http://localhost:3000/metrics`，能看到 `http_requests_total`、`http_request_duration_seconds_bucket` 等文字。
+
+2. **Prometheus 抓到**：在 `prometheus.yml` 加 `job_name: 'myapp'`、`targets: ['myapp:3000']`，重啟 Prometheus。**驗收**：進 Prometheus 介面（`:9090`）的 Status → Targets，看到 `myapp` 是 **`UP`**。
+
+3. **Grafana 四個面板**，各用本章的 PromQL：
+   - 流量：`sum(rate(http_requests_total[5m]))`
+   - 錯誤率：`sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))`
+   - 延遲 p95：`histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))`
+   - 飽和度：`100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`
+
+**驗收整體**：先對服務打一些請求製造流量，四個面板都要有數字/曲線在動，而不是「No data」。若延遲面板出現 NaN，多半是 `by (le)` 忘了加，或還沒有足夠請求落進各個 bucket。
+
+（這題需要在你自己的環境實機操作，最終要回到畫面確認四個面板都正常顯示。）
+
+</details>
+
 ---
 
 ### 練習 2：標出 SLO 線
 
 幫「錯誤率」和「延遲 p95」面板各加一條對應 SLO 的閾值線。確認超標時會變紅。
 
+<details>
+<summary>參考解答</summary>
+
+在 Grafana 每個面板的編輯畫面裡，找到 **Thresholds（閾值）** 設定：
+
+- **錯誤率面板**：加一條閾值 **`0.001`**（因為這個 PromQL 算出來是「比例」，0.1% = 0.001；別誤填成 0.1）。base（綠）以上、超過 0.001 設成紅色。
+- **延遲 p95 面板**：加一條閾值 **`0.3`**（單位是「秒」，因為 `http_request_duration_seconds` 是以秒為單位，300ms = 0.3 秒）。超過 0.3 設成紅色。
+
+小技巧：
+- 若用的是 **Time series** 圖，可把 Threshold 的顯示模式設成「As lines」，這樣紅線會直接畫在圖上，曲線衝破就一眼看到。
+- 若用 **Stat / Gauge** 面板，超過閾值時整個數字/量表會直接變紅。
+
+**驗收**：手動製造超標狀況（灌 500 或製造高延遲），對應面板應該從綠轉紅。這正是 3-4 說的「把判斷內建進儀表板」——不用心算，碰紅線就是違反 SLO。
+
+（此題需實機操作並回到畫面確認顏色變化。）
+
+</details>
+
 ---
 
 ### 練習 3：驗證它真的會反應
 
 製造一些錯誤或負載，觀察對應的黃金訊號面板有沒有即時反應、有沒有衝破 SLO 線。寫下你的觀察。
+
+<details>
+<summary>參考解答</summary>
+
+用本章第五步的做法製造狀況，例如對會出錯的端點灌一批請求：
+
+```bash
+for i in {1..50}; do curl -s http://localhost:3000/some-failing-endpoint > /dev/null; done
+```
+
+**預期觀察（示範）**：
+- **流量面板**：RPS 在灌請求的那幾秒明顯上升，停手後回落。
+- **錯誤率面板**：因為這批請求回 500，`status=~"5.."` 的速率上升，錯誤率在幾秒內竄高，**衝破你畫的 0.001（0.1%）紅線並變紅**——你親眼看到「SLO 正在被違反」被監控即時捕捉到。
+- **延遲 p95 面板**：如果製造的是慢請求（而非快速失敗的 500），p95 會爬升；若衝破 0.3 秒紅線也會變紅。（注意：純 500「快速失敗」的延遲很低，反而不會讓延遲面板變紅——這正好呼應 3-1 說的「成功與失敗延遲要分開看」。）
+
+**為什麼不是「立刻」變化**：PromQL 用的是 `rate(...[5m])`，是「過去 5 分鐘的平均速率」，所以曲線是平滑地爬升、也會平滑地回落，不會像開關一樣瞬間跳動——這是正常的，別誤以為監控壞了。
+
+**重點心得**：監控不只是好看的圖，它真的會在「SLO 被違反」時反應。這個能反應的監控，下一步（Part 4）就能拿去設告警，讓你不用 24 小時盯著螢幕。
+
+（此題需實機操作，最終要回到 Grafana 畫面觀察並記錄實際反應。）
+
+</details>
 
 > 你現在有了「對齊 SLO 的黃金訊號監控」。但光看圖還不夠——你不可能 24 小時盯著。下一個 Part 4 就要解決：怎麼讓系統在「SLO 快被違反時」主動通知你，而且只在「真的需要」時才響。
 
