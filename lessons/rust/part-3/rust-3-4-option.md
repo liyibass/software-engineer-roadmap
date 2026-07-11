@@ -111,6 +111,60 @@ fn main() {
 2. 用 `match` 處理上題的回傳值，分別印出「空白在第 N 位」或「沒有空白」。
 3. 把上題改用 `unwrap_or` 給一個預設值（例如 `0`），比較兩種寫法。想想各自適合什麼情境。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：回傳 Option 的函式**
+
+「找位置」天生可能找不到，正好用 `Option`。這裡用 `chars().enumerate()` 一邊數位置一邊看字元：
+
+```rust
+fn find_first_space(s: &str) -> Option<usize> {
+    for (index, ch) in s.chars().enumerate() {
+        if ch == ' ' {
+            return Some(index);   // 找到空白 → 包進 Some
+        }
+    }
+    None                          // 整段都沒空白 → None
+}
+```
+
+> 小提醒：`char_indices()` 回傳的是「位元組位置」，`enumerate()` 回傳的是「第幾個字元」。對純英數字串兩者一樣；若字串含中文等多位元組字元，兩者會不同。這裡練習概念，用 `enumerate()` 即可。
+
+**第 2 題：用 match 處理**
+
+`match` 逼你把 `Some` 和 `None` 兩種情況都寫出來：
+
+```rust
+fn main() {
+    let text = "hello world";
+    match find_first_space(text) {
+        Some(pos) => println!("空白在第 {} 位", pos),   // hello 後面 → 5
+        None => println!("沒有空白"),
+    }
+}
+```
+
+**第 3 題：改用 unwrap_or**
+
+```rust
+fn main() {
+    let text = "hello world";
+    // 有值就用那個位置，None 就用預設 0
+    let pos = find_first_space(text).unwrap_or(0);
+    println!("位置（沒有就當 0）：{}", pos);
+}
+```
+
+**兩種寫法怎麼選？**
+
+- `match`：**兩種情況做的事不一樣**時最適合——例如「有空白」要印位置、「沒空白」要印另一段訊息。它強迫你正視 `None`，最清楚也最安全。
+- `unwrap_or`：**你只想要一個值，且沒有時用預設就好**的時候最簡潔。但要小心語意陷阱——這裡用 `0` 當預設，會讓「沒有空白」和「空白剛好在第 0 位」變得無法區分。所以 `unwrap_or` 適合「預設值本身就是合理答案」的情境；如果需要區分「有沒有」，還是該用 `match`。
+
+順帶一提：**別用 `.unwrap()`**（不帶 `_or`）——它遇到 `None` 會直接 panic 讓程式當掉，等於把「可能沒值」的炸彈又裝回去了。
+
+</details>
+
 ## 課外讀物
 
 > 「把可能不存在的狀態寫進型別、讓編譯器逼你處理」是強型別的核心價值 → [課外讀物 E-6-4：TypeScript 最佳實踐](../../../課外讀物/E-6-best-practices/E-6-4-typescript-best-practices.md)（TS 的 `strictNullChecks`、`T | undefined` 是類似精神）

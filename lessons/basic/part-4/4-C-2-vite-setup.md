@@ -177,6 +177,62 @@ Vite 會在 `dist/` 產出壓縮好的成品。打開 `dist/` 看一眼，你會
 
 **練習 3**：把一個 `interface Todo` 抽到一個獨立檔案 `types.ts`，然後在另一個檔案用 `import { Todo } from "./types"` 引入。確認 TypeScript 沒有報錯——這就是「共用型別」最小的練習。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**（需自行實機驗證）
+
+做法：
+
+```bash
+npm create vite@latest my-app -- --template vanilla-ts
+cd my-app
+npm install
+npm run dev
+```
+
+打開它印出的網址（通常是 `http://localhost:5173`），然後改 `src/main.ts` 裡的文字並存檔。
+
+驗收點：**不用手動重整**，瀏覽器畫面會自己更新。這就是 HMR（熱模組替換）——存檔即見效，正是上一章講的痛點三被解決的體驗。
+
+**練習 2**（需自行實機驗證）
+
+做法：對同一個專案跑 `npm run build`，然後打開 `dist/assets/` 裡產出的 `.js` 檔。
+
+驗收點：跟你寫的原始碼比，它變成——變數名被改得又短又沒意義（例如 `a`、`b`）、空白與換行被刪光、擠成幾乎沒有斷行的一長串。
+
+為什麼上線版要這樣壓縮：這叫 **minify（最小化）**。人看不懂沒關係（機器執行不受影響），但檔案體積變小 → 使用者下載更快 → 網站載入更快。開發時要「好讀好除錯」，上線時要「小而快」，這就是 `dev` 和 `build` 針對兩種不同目標各自最佳化的結果。
+
+**練習 3**
+
+抽出共用型別的最小示範。先建立 `types.ts`：
+
+```typescript
+// types.ts —— 唯一定義 Todo 的地方（single source of truth）
+export interface Todo {
+  id: number
+  text: string
+  completed: boolean
+}
+```
+
+再在另一個檔案（例如 `main.ts`）引入它：
+
+```typescript
+// main.ts
+import type { Todo } from "./types"
+
+const todo: Todo = { id: 1, text: "學會共用型別", completed: false }
+
+console.log(todo)
+```
+
+驗收點：TypeScript 不會報錯，而且 `todo` 少填一個欄位（例如漏掉 `completed`）時，它會在你 import 的這個檔案裡就報錯。
+
+重點：`interface` 前面要加 `export` 才能被別的檔案 import；只當「型別」用時，習慣寫 `import type { Todo }`（告訴編譯器這只是型別、打包時可以整行拿掉）。這樣一來 `Todo` 只有一份定義，未來前後端都 import 它，就不會發生「兩份定義貌合神離」的隱患。
+
+</details>
+
 ---
 
 ## 課外讀物

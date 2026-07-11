@@ -113,6 +113,28 @@ echo "<h1>🚀 我的網站跑在 AWS EC2 上！</h1>" | sudo tee /var/www/html/
 
 照六步，開一台 EC2、SSH 進去、架起 Nginx 網站，從瀏覽器看到你的網頁。最後記得清理。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，實際操作請自行在你的 AWS 帳號裡完成（本解答只給做法與驗收點，不會真的幫你建立資源）。完整做法照本章六步：
+
+1. **啟動 EC2**：選好 Region → EC2 → Launch instance → 取名 → AMI 選 Ubuntu（Free tier eligible）→ Instance type 選 `t3.micro`（或 `t2.micro`）→ Create new key pair 並**下載 `.pem` 私鑰檔妥善保存**。
+2. **設 Security Group**：開放 SSH（22，Source 選 My IP）和 HTTP（80，Source 選 Anywhere），然後啟動，等狀態變 Running，記下 Public IPv4 address。
+3. **SSH 進去**：先 `chmod 400 你的金鑰.pem`，再 `ssh -i 你的金鑰.pem ubuntu@你的公開IP`，第一次問信任輸入 `yes`。
+4. **裝 Nginx**：`sudo apt update` → `sudo apt install nginx -y` → `systemctl status nginx` 確認在跑，再用 `echo "..." | sudo tee /var/www/html/index.html` 改首頁。
+5. **見證成果**：瀏覽器開 `http://你的公開IP`，看到自己的網頁。
+6. **清理**：EC2 console 選 instance → Instance state → Stop（短期還要用）或 Terminate（不要了）。
+
+**驗收點**（怎麼算成功）：
+- `ssh` 能成功連進去，`whoami` 顯示 `ubuntu`、`uname -a` 看到 Linux。
+- `systemctl status nginx` 顯示 `active (running)`。
+- 從**你電腦的瀏覽器**（不是機器內）連公開 IP 能看到你改的網頁。
+- 練習後 instance 已 Stop 或 Terminate，不再無謂計費。
+
+> ⚠️ 這題必須自行在 AWS 實機操作驗證；請務必在做完後清理資源，避免忘了關而計費。
+
+</details>
+
 ---
 
 ### 練習 2：理解 Security Group
@@ -122,6 +144,21 @@ echo "<h1>🚀 我的網站跑在 AWS EC2 上！</h1>" | sudo tee /var/www/html/
 1. 為什麼 SSH（22）的 Source 建議設「My IP」而不是「Anywhere」？
 2. 如果你忘了開 80 port，會發生什麼？（提示：用 infra Part 3-4 的排查思路想）
 
+<details>
+<summary>參考解答</summary>
+
+**1. 為什麼 SSH 的 Source 建議設「My IP」：**
+
+因為 SSH（22 port）是「登入你機器的大門」，權限很大。如果 Source 設「Anywhere（0.0.0.0/0）」，等於**全世界任何 IP 都能來敲你的 SSH 門**——網路上有大量自動化程式整天掃描開放的 22 port，猜帳號密碼。設成「My IP」表示**只允許你自己現在這個 IP 連進來**，把攻擊面縮到最小（呼應 infra Part 3-3 防火牆、aws-2-2 最小權限的精神）。相對地，網站的 80 port 本來就是要給大家看的，所以才對 Anywhere 開放。
+
+**2. 如果忘了開 80 port：**
+
+**SSH 還是連得進去（22 有開），但從瀏覽器連 `http://公開IP` 會連不到、一直轉圈或逾時**。原因是：即使 EC2 是 Running、Nginx 也在跑，Security Group 這道雲端防火牆會**把外面進來的 80 port 流量擋掉**，請求根本到不了 Nginx。
+
+用 infra Part 3-4 的分層排查思路：先確認 EC2 是 Running（機器層 OK）→ SSH 進去看 `systemctl status nginx` 是 active（服務層 OK）→ 在機器**內**用 `curl localhost` 能拿到網頁（本機層 OK）→ 但機器**外**連不到，就能鎖定問題在「網路/防火牆層」，也就是 Security Group 沒開 80。補開 80（Source: Anywhere）後就通了。
+
+</details>
+
 ---
 
 ### 練習 3：對照 infra
@@ -129,6 +166,27 @@ echo "<h1>🚀 我的網站跑在 AWS EC2 上！</h1>" | sudo tee /var/www/html/
 回答：這次在 EC2 上做的事，哪些是「AWS 特有的」、哪些是「infra 課學過、在哪台 Linux 都一樣的」？
 
 > 提示：開機器、Security Group、公開 IP 是 AWS 的；SSH、apt、Nginx、systemctl 是通用 Linux 的。這就是「先學 infra、再學 AWS 會很快」的原因。
+
+<details>
+<summary>參考解答</summary>
+
+把這次做的事分成兩類：
+
+**AWS 特有的（換一朵雲或換供應商就不一樣）：**
+- 在 Console 按 **Launch instance** 開機器、選 AMI / Instance type / Key pair。
+- 設定 **Security Group**（AWS 的雲端防火牆）。
+- 拿到 **Public IPv4 address（公開 IP）**、以及 Stop / Terminate 這些機器生命週期操作。
+- 這些是「怎麼把機器開出來、怎麼讓它能被連到」的部分，是 AWS 平台幫你管的那一層。
+
+**infra 學過、在哪台 Linux 都一樣的（通用技能）：**
+- 用 `ssh -i 金鑰 ubuntu@IP` 連線、`chmod 400` 設金鑰權限（infra Part 2）。
+- `sudo apt update`、`sudo apt install nginx`（套件管理，infra Part 2-5、4-3）。
+- `systemctl status nginx` 看服務狀態（infra Part 4-1）。
+- 改 `/var/www/html/index.html`、用 `curl` 排查（infra Part 4、3-4）。
+
+**重點**：一旦 SSH 進去，它就是一台普通的 Linux 機器，infra 的知識全部適用；AWS 只是多了「把機器開出來、接上網路」這一層。這就是為什麼「先學 infra、再學 AWS 會很快」——你只要多學 AWS 那薄薄一層的操作，底下的 Linux 功力直接沿用。
+
+</details>
 
 ## 課外讀物
 

@@ -158,6 +158,15 @@ ansible webservers -i ~/infra-practice/inventory.ini -m ping
 1. Ansible 為什麼不用在目標機器上裝代理程式？它靠什麼連過去？
 2. 為什麼「你的 WSL」很適合當 Ansible 的控制機？
 
+<details>
+<summary>參考解答</summary>
+
+1. **為什麼不用裝代理程式、靠什麼連過去**：因為 Ansible 是 **agentless（免代理）** 設計，它不需要目標機器上有專屬的「代理程式」常駐。它靠的是你早就很熟的 **SSH**：Ansible 從你的控制機透過 SSH 連進目標機器、把要做的動作丟過去執行。目標機器只需要滿足兩個很基本的條件——**能被 SSH 連進去**、**有 Python**（Linux 幾乎都內建）——就能被管理，完全不用預先安裝任何 Ansible 的東西。這省掉了「先幫每台機器裝代理」的麻煩，也少了一個要維護的元件。
+
+2. **為什麼 WSL 適合當控制機**：因為控制機的要求很單純——只要能裝 Ansible、能透過 SSH 連到目標機器就行。WSL 是一個完整的 Linux 環境，`apt install ansible` 就能裝好 Ansible，也能像平常一樣用 `ssh` 連到你的 EC2。加上它就跑在你自己的電腦上，隨開隨用、不用另外花錢租一台機器。所以「從 WSL 用 Ansible 去管理雲端的 EC2」是非常標準、順手的組合。
+
+</details>
+
 ---
 
 ### 練習 2：理解冪等性
@@ -167,6 +176,19 @@ ansible webservers -i ~/infra-practice/inventory.ini -m ping
 1. 什麼是冪等性？為什麼它讓你能「放心地重複執行」？
 2. 同一個 task「確保 nginx 已安裝」，第一次跑和第二次跑，Ansible 的行為有什麼不同？
 
+<details>
+<summary>參考解答</summary>
+
+1. **什麼是冪等性、為什麼能放心重複執行**：冪等（idempotent）的意思是「同一份 playbook，跑一次和跑十次，結果完全一樣」。因為 Ansible 的每個 task 描述的是「**期望的狀態**」，而不是「要做的動作」——它會**先檢查現況，只在還沒達標時才動手**，已經是目標狀態的就完全不碰。正因如此，你不用擔心「重複執行會不會把已經設好的東西搞壞」，可以放心地一跑再跑。這也讓修正設定變得很簡單：改一行 playbook、重跑，Ansible 只處理「有變的那部分」。
+
+2. **第一次跑 vs 第二次跑的行為差別**：
+   - **第一次跑**：nginx 還沒裝，Ansible 檢查後發現「沒達到目標」，於是幫你安裝。這個 task 的狀態會顯示 **`changed`**（有做出改動）。
+   - **第二次跑**：nginx 已經裝好了，Ansible 檢查後發現「現況已經是目標狀態」，於是**什麼都不做**。這個 task 的狀態會顯示 **`ok`**（已達標、沒有改動）。
+
+   對比 Part 6-1 的 shell 腳本：如果你寫 `apt install nginx`，它每次都會傻傻地跑一遍；而 Ansible 是「先看有沒有必要，再決定動不動手」——這正是宣告式（描述目標）和命令式（描述步驟）的差別。
+
+</details>
+
 ---
 
 ### 練習 3：裝好並連通
@@ -174,6 +196,63 @@ ansible webservers -i ~/infra-practice/inventory.ini -m ping
 在你的 WSL 裝好 Ansible，建立 inventory，用 `-m ping` 成功 ping 到你的伺服器（EC2）。
 
 > 提示：如果 ping 失敗，多半是 SSH 連線設定問題——回想 Part 3-2，先確認你能用 `ssh` 手動連進去，Ansible 才連得到。
+
+<details>
+<summary>參考解答</summary>
+
+這是動手題，需要你自己在 WSL 上實機操作驗證。完整流程如下：
+
+**第一步：在控制機（WSL）裝 Ansible**
+
+```bash
+sudo apt update
+sudo apt install ansible -y
+ansible --version
+```
+
+最後一行有印出版本，代表裝好了。
+
+**第二步：建立 inventory**
+
+```bash
+vi ~/infra-practice/inventory.ini
+```
+
+填入你的機器（IP 和使用者換成你自己 EC2 的）：
+
+```ini
+[webservers]
+myserver ansible_host=你的EC2-IP ansible_user=deploy
+```
+
+**第三步：先確認 SSH 能手動連通（關鍵前置）**
+
+在動 Ansible 前，先自己 `ssh` 一次，確認金鑰、使用者、IP 都對：
+
+```bash
+ssh deploy@你的EC2-IP
+```
+
+能進去就代表 SSH 這條路是通的，Ansible 才連得到。
+
+**第四步：用 ping module 測試**
+
+```bash
+ansible webservers -i ~/infra-practice/inventory.ini -m ping
+```
+
+**驗收點**：看到類似下面的輸出，尤其是 `SUCCESS` 和 `"pong"`，就代表成功：
+
+```
+myserver | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+```
+
+如果失敗（例如 `UNREACHABLE`），照提示回頭查 SSH：確認 IP 對不對、`ansible_user` 是不是你真正能登入的帳號、金鑰有沒有設好。先讓手動 `ssh` 能進去，Ansible 的 ping 自然就會通。
+
+</details>
 
 ## 課外讀物
 

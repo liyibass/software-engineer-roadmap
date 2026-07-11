@@ -288,6 +288,48 @@ curl -X POST http://localhost:3000/todos \
 
 **練習 3**：把後端範例四裡的 `app.use(express.json())` 那行**註解掉**，重啟後再 POST 一筆。觀察 `request.body` 變成什麼？（提示：會是 `undefined`，於是 `request.body.text` 就爆炸了。）這驗證了「為什麼那行不能少」。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**（需自行實機驗證）
+
+做法：先把範例四的後端跑起來（`npm run dev`），再開另一個終端機貼上題目那段 `curl -X POST ...`，最後用瀏覽器開 `http://localhost:3000/todos`。
+
+驗收點：
+
+- `curl` 那筆會回傳剛建立的物件，例如 `{"id":2,"text":"用 curl 新增的待辦","completed":false}`，狀態碼 201。
+- 瀏覽器打開 `/todos` 應該看到清單裡多了「用 curl 新增的待辦」這一筆——證明 POST 真的把資料寫進後端那個陣列了。
+- 提醒：因為資料存在記憶體陣列，只要你重啟伺服器，這筆就會消失（這正是 V2 的限制）。
+
+**練習 2**（需自行實機驗證）
+
+做法：**不要**啟動後端，直接在前端呼叫 `loadTodos()`（例如按下觸發它的按鈕）。打開 DevTools 的 Console。
+
+驗收點：你會看到 `fetch` 直接 `throw`、掉進 `catch`，Console 印出類似：
+
+```
+無法載入待辦清單： TypeError: Failed to fetch
+```
+
+這就是本章強調的重點——「完全連不到伺服器」屬於**網路層級的失敗**，`fetch` 這時才會 `throw`、進 `catch`。（對照之下，後端有回應但回 404/500 並不會進 `catch`，那要靠自己檢查 `response.ok`。）
+
+**練習 3**（需自行實機驗證）
+
+做法：把後端範例四的 `app.use(express.json())` 註解掉，重啟後再 POST 一筆。
+
+驗收點：
+
+- `request.body` 會是 `undefined`（少了 `express.json()`，Express 根本沒去解析進來的 JSON Body，所以 `request.body` 沒被填上東西）。
+- 於是 `request.body.text` 這行會爆炸，因為你在對 `undefined` 取 `.text` 屬性，錯誤訊息類似：
+
+```
+TypeError: Cannot read properties of undefined (reading 'text')
+```
+
+這就驗證了為什麼那行不能少：`express.json()` 是「把原始 JSON 文字解析成 JavaScript 物件、放進 `request.body`」的那道手續，拿掉它，後端就讀不到前端送來的資料。
+
+</details>
+
 ---
 
 ## 課外讀物

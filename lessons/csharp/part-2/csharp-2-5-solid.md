@@ -117,6 +117,111 @@ SOLID 是「指南」不是「枷鎖」：
 2. 找出這個設計違反哪個原則：「一個 `Report` class 同時負責『產生報表內容』和『把報表寄 email』」。怎麼改？
 3. 把一個「寫死依賴具體 class」的程式，改成「依賴介面 + 從建構子注入」（DIP），說明改善了什麼。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：一句話概括 SOLID 五原則**
+
+- **S（單一職責）**：一個 class 只該有一個改變的理由——只做一件事。
+- **O（開放封閉）**：對「擴充」開放、對「修改」封閉——加功能靠加新程式碼，而非改舊的。
+- **L（里氏替換）**：子類別要能無痛替換父類別而不破壞程式——子類別別違背父類別的承諾。
+- **I（介面隔離）**：介面要小而專一，別逼實作者去實作用不到的方法。
+- **D（依賴反轉）**：依賴抽象（介面），不依賴具體實作。
+
+**第 2 題：`Report` 同時「產生內容」又「寄 email」違反哪個原則？怎麼改？**
+
+違反的是 **S（單一職責原則，SRP）**。這個 class 有「兩個改變的理由」：報表格式改變時要動它，寄信方式（換成 SMTP、換成第三方 API）改變時也要動它——兩件不相干的事綁在一起，改一個容易弄壞另一個。
+
+改法是拆成各司其職的兩個 class：
+
+```csharp
+// ❌ 違反 SRP：一個 class 管兩件事
+class Report
+{
+    public string Generate() { /* 產生報表內容 */ return "報表內容"; }
+    public void SendByEmail() { /* 寄 email */ }
+}
+
+// ✅ 拆開
+class Report
+{
+    public string Generate() { return "報表內容"; }   // 只負責產生內容
+}
+
+class EmailSender
+{
+    public void Send(string content) { /* 只負責寄信 */ }
+}
+
+// 使用時由外部協調
+var report = new Report();
+var sender = new EmailSender();
+sender.Send(report.Generate());
+```
+
+好處：報表邏輯改變只動 `Report`、寄信方式改變只動 `EmailSender`，互不干擾；`EmailSender` 也能拿去寄別的東西（重用）。→ **[課外讀物 E-7-2] S — 單一職責原則**。
+
+**第 3 題：把「寫死依賴具體 class」改成「依賴介面 + 建構子注入」（DIP）**
+
+改造前，`OrderService` 在內部 `new` 出具體的 `SqlOrderRepository`，被綁死了：
+
+```csharp
+// ❌ 改造前：依賴具體實作
+class SqlOrderRepository
+{
+    public void Save(string order) { /* 存進 SQL */ }
+}
+
+class OrderService
+{
+    private readonly SqlOrderRepository _repo = new SqlOrderRepository();  // 綁死
+
+    public void PlaceOrder(string order) => _repo.Save(order);
+}
+```
+
+改造後，先抽出介面，`OrderService` 只依賴介面，實作從建構子「注入」進來：
+
+```csharp
+// ✅ 改造後：依賴抽象 + 建構子注入
+interface IOrderRepository
+{
+    void Save(string order);
+}
+
+class SqlOrderRepository : IOrderRepository
+{
+    public void Save(string order) { /* 存進 SQL */ }
+}
+
+class OrderService
+{
+    private readonly IOrderRepository _repo;
+
+    public OrderService(IOrderRepository repo)   // 從外面注入，不在乎實際是哪個實作
+    {
+        _repo = repo;
+    }
+
+    public void PlaceOrder(string order) => _repo.Save(order);
+}
+
+// 正式用 SQL 實作
+var service = new OrderService(new SqlOrderRepository());
+// 測試時換成假的實作，完全不用改 OrderService
+// var testService = new OrderService(new FakeOrderRepository());
+```
+
+**改善了什麼：**
+
+1. **好換實作**：想從 SQL 換成別的資料庫，只要寫新的 `IOrderRepository` 實作，`OrderService` 一行都不用改（也順帶符合 OCP）。
+2. **好測試**：測試時注入一個假的（mock）repository，不用真連資料庫就能測 `OrderService` 的邏輯。
+3. **鬆耦合**：`OrderService` 不再知道也不在乎資料到底存去哪，職責更單純。
+
+這正是 ASP.NET Core 依賴注入（[csharp-4-4]）的理論基礎 → **[課外讀物 E-7-6] D — 依賴反轉原則**。
+
+</details>
+
 ## 課外讀物
 
 > SOLID 完整深入 → [課外讀物 E-7：SOLID 原則總覽](../../../課外讀物/E-7-solid/E-7-1-solid-overview.md)（每個原則都有專章 E-7-2~E-7-6）

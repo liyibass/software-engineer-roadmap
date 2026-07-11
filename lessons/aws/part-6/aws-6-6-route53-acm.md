@@ -136,17 +136,53 @@ graph LR
 
 用一句話分別說明 Route 53 和 ACM 的作用。它們對應你 infra 課學的什麼概念？
 
+<details>
+<summary>參考解答</summary>
+
+- **Route 53**：AWS 的 **DNS 服務**——把好記的網域名稱（`www.myapp.com`）翻譯 / 指向到你的 AWS 資源（ALB、CloudFront、S3）。對應 infra Part 3-1 學的 **DNS**。（名字由來：DNS 用的 port 是 53。）
+- **ACM**（AWS Certificate Manager）：幫你**免費簽發、並自動續期 HTTPS（SSL/TLS）憑證**，套用到 ALB / CloudFront，讓服務有 HTTPS 安全鎖頭。對應 infra Part 4-4 學的 **HTTPS 與憑證**（infra 是自己跑 certbot / Let's Encrypt，ACM 幫你自動化掉）。
+
+</details>
+
 ---
 
 ### 練習 2：Alias 記錄
 
 回答：為什麼把網域指向 ALB/CloudFront 時，要用 AWS 特有的「Alias 記錄」，而不是一般的 A 記錄（指向 IP）？
 
+<details>
+<summary>參考解答</summary>
+
+因為 **ALB、CloudFront 的底層 IP 是會變動的**（AWS 會依規模、健康狀況隨時增減背後的節點）。如果你用一般的 **A 記錄**寫死某個 IP，那個 IP 一變，你的網域就指到不存在的地方、服務掛掉——你根本追不上它變。
+
+**Alias 記錄**是 AWS 特有的解法：它讓你直接把網域指向「**那個 AWS 資源本身**」（這個 ALB、這個 CloudFront 分佈），底層 IP 怎麼變由 **AWS 自動幫你更新對應**，你完全不用管。
+
+補充：Alias 還有兩個附帶好處——可以直接掛在**根網域**（zone apex，如 `myapp.com`，這是一般 CNAME 做不到的），而且**不額外收查詢費**。所以本章的原則是：**指向 AWS 資源時，優先用 Alias。**
+
+</details>
+
 ---
 
 ### 練習 3：串起完整流程
 
 描述「讓使用者能用 `https://myapp.com` 連到你的服務」需要的三個步驟（ACM 憑證、套用、Route 53 指向）。
+
+<details>
+<summary>參考解答</summary>
+
+三步：
+
+1. **用 ACM 申請憑證**：為 `myapp.com` 申請一張 ACM 憑證。ACM 會要你「**驗證網域擁有權**」——通常是在 Route 53 加一筆驗證用的 DNS 記錄（可自動完成），驗證過憑證就核發。
+
+2. **把憑證套用到資源**：到 CloudFront / ALB 的設定裡，**選用這張 ACM 憑證**。之後這些資源就會用它來處理 HTTPS（提供安全鎖頭）。
+
+3. **用 Route 53 把網域指向資源**：在 Route 53 加一筆 **Alias 記錄**，把 `myapp.com` → 指向你的 CloudFront / ALB。
+
+完成後，使用者連 `https://myapp.com`：Route 53 把網域解析到你的資源 → 資源用 ACM 憑證提供 HTTPS → 連到你的服務。
+
+> 動手做的話（自行在自己的 AWS 帳號實機驗證，本題不需要真的建立資源）：驗收點是——瀏覽器開 `https://myapp.com` 能正常載入、網址列出現鎖頭且憑證簽發者是 Amazon、且沒有憑證錯誤或「不安全」警告。CLI 可用 `aws acm request-certificate`、`aws route53 change-resource-record-sets` 等指令操作，但實際套用與 DNS 生效仍需在 Console / 實機確認。
+
+</details>
 
 ## 課外讀物
 

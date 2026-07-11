@@ -106,6 +106,65 @@ Hello, World!
 2. 在 `Program.cs` 多加幾行 `Console.WriteLine`，印出三行不同的字，確認每行都要分號。
 3. 故意刪掉一行的分號，`dotnet build` 看看編譯器的錯誤訊息——習慣去讀它（這是學任何語言的重要技能）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：完整跑一遍，印出你的名字**
+
+做法：裝好 SDK 後，在終端機依序執行建專案指令，再把 `Program.cs` 改成印你的名字，最後 `dotnet run`。
+
+```bash
+dotnet new console -o HelloCSharp
+cd HelloCSharp
+```
+
+把 `Program.cs` 改成（以「小明」為例）：
+
+```csharp
+Console.WriteLine("Hello, 我是小明!");
+```
+
+執行：
+
+```bash
+dotnet run
+```
+
+驗收點：終端機印出 `Hello, 我是小明!`。（此題需你自行實機驗證：先確認 `dotnet --version` 有版本號，再確認 `dotnet run` 的輸出就是你改的那行字。）
+
+**第 2 題：印出三行不同的字**
+
+每一行都是一個獨立的 `Console.WriteLine`，結尾都要有分號 `;`：
+
+```csharp
+Console.WriteLine("第一行：學 C# 中");
+Console.WriteLine("第二行：每行都要分號");
+Console.WriteLine("第三行：跑起來囉");
+```
+
+驗收點：`dotnet run` 後主控台會依序印出三行。（需自行實機驗證。）
+
+**第 3 題：刪掉分號，看編譯器錯誤**
+
+做法：把上面任一行結尾的 `;` 刪掉，例如：
+
+```csharp
+Console.WriteLine("第一行：學 C# 中")   // 故意漏掉分號
+Console.WriteLine("第二行：每行都要分號");
+```
+
+執行 `dotnet build`，編譯器會報類似這樣的錯誤：
+
+```
+error CS1002: ; expected
+```
+
+`CS1002` 是 C# 的錯誤代碼，`; expected` 就是「這裡預期要有一個分號」。訊息通常還會指出是哪個檔案的第幾行、第幾個字元出錯。
+
+重點（也是這題的用意）：**學會讀編譯器錯誤訊息**——它會告訴你錯誤代碼、原因、位置。把分號補回去再 build，錯誤就會消失。（需自行實機驗證，觀察你的錯誤訊息長什麼樣子。）
+
+</details>
+
 ## 課外讀物
 
 > NuGet 套件生態（與 npm 相通）→ [課外讀物 E-2：npm 與套件生態](../../../課外讀物/E-2-npm/E-2-1-npm-intro.md)

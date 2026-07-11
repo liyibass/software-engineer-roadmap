@@ -207,6 +207,65 @@ app.get("/boom", (request, response) => {
 
 **練習 3**：替 `PUT /todos/:id` 加一個檢查：如果前端送來的 `completed` 不是布林值（例如送了字串 `"yes"`），回 400 並附上有意義的錯誤訊息。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**（需自行實機驗證）
+
+做法：在後端加上題目那個會 throw 的 `/boom` 端點（確認你的錯誤處理中介層 `app.use(errorHandler)` 有掛在所有路由之後），重啟後用瀏覽器訪問 `http://localhost:3000/boom`。
+
+驗收點：你收到的應該是——
+
+```
+狀態碼：500
+Body：{ "error": "伺服器發生未預期的錯誤，請稍後再試" }
+```
+
+而**不是**一坨 `Error: 我故意炸的` 加上一長串檔案路徑的堆疊訊息。同時，伺服器那邊的終端機會印出 `未預期的錯誤： Error: 我故意炸的 ...`（完整細節記在伺服器日誌）。這就驗證了安全網的價值：對外只給乾淨、一致的一句話，對內保留完整資訊方便除錯。
+
+（小提醒：這個「同步 throw 自動轉給錯誤中介層」的行為是 Express 4 的特性；如果是在 `async` 函式裡 throw，Express 4 不會自動接住，那要另外處理——入門先掌握同步這個情況即可。）
+
+**練習 2**（需自行實機驗證）
+
+做法：把後端錯誤格式從 `{ error: "..." }` 改成 `{ message: "..." }`，前端**維持不動**（前端仍然讀 `errorData.error`）。然後觸發一個會失敗的操作（例如新增一筆空白待辦）。
+
+驗收點：前端的 `alert` 會顯示 `新增失敗：undefined`。因為前端去拿 `errorData.error`，但後端這次把訊息放在 `message` 欄位，`error` 欄位不存在 → 拿到 `undefined`。
+
+這正是本章的核心論點：**格式一旦不一致，前端就默默壞掉**——而且編譯時不會報錯，是執行時才看到 `undefined`，很難追。所以「全站講好一種錯誤格式」才這麼重要。
+
+**練習 3**
+
+替 `PUT /todos/:id` 在動手更新前先驗證 `completed`：
+
+```typescript
+app.put("/todos/:id", (request, response) => {
+  const id = Number(request.params.id)
+  const todo = todos.find((item) => item.id === id)
+
+  if (!todo) {
+    response.status(404).json({ error: `找不到 id 為 ${id} 的待辦` })
+    return
+  }
+
+  // 新增的檢查：completed 一定要是布林值，否則是前端的錯 → 400
+  if (typeof request.body.completed !== "boolean") {
+    response.status(400).json({ error: "completed 必須是 true 或 false" })
+    return
+  }
+
+  todo.completed = request.body.completed
+  response.json(todo)
+})
+```
+
+重點：
+
+- 用 `typeof ... !== "boolean"` 檢查，這樣不管前端送的是字串 `"yes"`、數字 `1`、還是根本沒送（`undefined`），都會被擋下來。
+- 這是「前端送錯資料」，所以回 `400`（不是 500，因為不是後端的錯）。
+- 錯誤訊息 `completed 必須是 true 或 false` 對人有意義，前端拿到就知道該怎麼修——呼應本章「錯誤訊息要清楚、可預期」的精神。
+
+</details>
+
 ---
 
 ## 課外讀物

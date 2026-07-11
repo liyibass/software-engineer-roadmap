@@ -306,6 +306,58 @@ console.log(formatPrice(discounted, "TWD"))
 - `utils.ts` 放 `calculateDiscount` 和 `formatPrice`（記得 import 需要的型別）
 - `index.ts` 只留最後三行邏輯，import 需要的東西
 
+<details>
+<summary>參考解答</summary>
+
+拆檔案的思路很直觀：型別歸型別、函式歸函式，最後 `index.ts` 只負責「把大家組起來用」。
+
+先把兩個型別搬到 `types.ts`，記得每個都要加 `export`，不然別的檔案借不到：
+
+```typescript
+// types.ts
+
+export interface Product {
+  id: number
+  name: string
+  price: number
+}
+
+export type Currency = "TWD" | "USD"
+```
+
+接著 `utils.ts` 放兩個函式。這裡有個關鍵：`formatPrice` 用到了 `Currency` 型別，所以 `utils.ts` 得先 `import` 它進來。因為 `Currency` 只是型別、不是真的 JavaScript 值，用 `import type` 最準確：
+
+```typescript
+// utils.ts
+
+import type { Currency } from "./types"
+
+export function calculateDiscount(price: number, discountRate: number): number {
+  return price * (1 - discountRate)
+}
+
+export function formatPrice(price: number, currency: Currency): string {
+  return `${currency} ${price.toFixed(2)}`
+}
+```
+
+最後 `index.ts` 就乾淨多了，只剩下真正的執行邏輯，需要什麼就從對應檔案借：
+
+```typescript
+// index.ts
+
+import type { Product } from "./types"
+import { calculateDiscount, formatPrice } from "./utils"
+
+const product: Product = { id: 1, name: "鍵盤", price: 1500 }
+const discounted = calculateDiscount(product.price, 0.1)
+console.log(formatPrice(discounted, "TWD"))  // TWD 1350.00
+```
+
+注意 `Product` 只拿來當型別註解，所以用 `import type`；`calculateDiscount` 和 `formatPrice` 是真的會被呼叫執行的函式，用一般的 `import`。這就是把一坨程式碼「依職責」拆開的基本功。
+
+</details>
+
 **練習 2 — 建立 Barrel File**
 
 承上題，現在再多一個 `validation.ts`：
@@ -328,3 +380,50 @@ import { calculateDiscount, formatPrice, isValidPrice, isValidProductName } from
 ```
 
 （提示：你需要把 `utils.ts` 和 `validation.ts` 移進 `utils/` 資料夾）
+
+<details>
+<summary>參考解答</summary>
+
+Barrel file 的重點就是：在資料夾裡放一個 `index.ts`，把資料夾內所有檔案的 export「集中轉發」出去。這樣外面的人只要認識這個資料夾，不用記每個檔案叫什麼。
+
+先把檔案照提示搬進 `utils/` 資料夾，結構會變成這樣：
+
+```
+utils/
+  math.ts          ← 原本的 utils.ts，放 calculateDiscount、formatPrice
+  validation.ts    ← isValidPrice、isValidProductName
+  index.ts         ← Barrel file（等一下要建立）
+```
+
+> 這裡把原本的 `utils.ts` 改名成 `utils/math.ts` 只是為了讓資料夾內每個檔名更貼切；你要沿用 `utils.ts` 這個名字也完全可以，重點是它進到 `utils/` 資料夾裡。
+
+然後建立 `utils/index.ts`，用 `export * from` 把每個檔案的東西原封不動再匯出一次：
+
+```typescript
+// utils/index.ts
+// 這個檔案的工作就是「把 utils 資料夾裡所有東西集合起來」
+
+export * from "./math"
+export * from "./validation"
+```
+
+`export * from "./math"` 的意思是：「把 `math.ts` 裡所有的 export，全部再 export 出去」。這樣 `calculateDiscount`、`formatPrice`、`isValidPrice`、`isValidProductName` 就全部集中在 `utils` 這個入口了。
+
+現在 `index.ts` 就能一行搞定：
+
+```typescript
+// index.ts
+// TypeScript 看到 "./utils" 會自動去找 utils/index.ts
+
+import { calculateDiscount, formatPrice, isValidPrice, isValidProductName } from "./utils"
+
+const price = 1500
+if (isValidPrice(price) && isValidProductName("鍵盤")) {
+  const discounted = calculateDiscount(price, 0.1)
+  console.log(formatPrice(discounted, "TWD"))  // TWD 1350.00
+}
+```
+
+以後要再加工具函式，只要在 `utils/index.ts` 補一行 `export * from "./newFile"`，外面的 import 一個字都不用改——這就是 barrel file 的價值。
+
+</details>

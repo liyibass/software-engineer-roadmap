@@ -137,6 +137,193 @@ library.Borrow(bob, book1);     // 現在 Bob 借得到了
 2. 加一個規則：書有「分類」，VIP 會員才能借「限定分類」的書（提示：給 Member 加 `IsVip`，給 Book 加分類）。
 3. 重構練習：如果未來「借閱記錄要存進資料庫」，你會怎麼用介面（`IBookRepository`，[csharp-2-4]）把「存取」抽出來？（這預告了 [csharp-9-1] 的分層架構。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（動手做）：完整打出來、跑起來，驗證兩個規則**
+
+做法：把本章「程式碼範例」的 `Book` / `Member` / `Library` 三個 class 加上使用範例整段貼進一個新的 C# 主控台專案（`dotnet new console` 後放進 `Program.cs`），然後 `dotnet run`。要驗證兩個規則，可以刻意觸發它們：
+
+```csharp
+var library = new Library();
+var book1 = new Book("深入淺出 C#", "某作者");
+library.AddBook(book1);
+
+var amy = new Member("Amy");
+var bob = new Member("Bob");
+
+// 驗證「已借走不能再借」
+library.Borrow(amy, book1);   // Amy 借了《深入淺出 C#》
+library.Borrow(bob, book1);   // 《深入淺出 C#》已被借走 → 回傳 false
+
+// 驗證「最多借 3 本」
+var b2 = new Book("書2", "作者"); var b3 = new Book("書3", "作者");
+var b4 = new Book("書4", "作者"); var b5 = new Book("書5", "作者");
+library.AddBook(b2); library.AddBook(b3); library.AddBook(b4); library.AddBook(b5);
+library.Borrow(bob, b2);   // 第 1 本，成功
+library.Borrow(bob, b3);   // 第 2 本，成功
+library.Borrow(bob, b4);   // 第 3 本，成功
+library.Borrow(bob, b5);   // Bob 已達借閱上限 → 回傳 false
+```
+
+**驗收點**：
+- 第二次 `Borrow(bob, book1)` 印出「《深入淺出 C#》已被借走」且回傳 `false`。
+- Bob 借第 4 本時印出「Bob 已達借閱上限」且回傳 `false`。
+- `library.Return(amy, book1)` 之後，Bob 再借 `book1` 就成功。
+
+> 這題需要你自行在本機實機執行、看主控台輸出確認，屬於動手驗證，光看程式碼不算完成。
+
+**第 2 題：加「分類」與「VIP 才能借限定分類」規則**
+
+給 `Book` 加分類、給 `Member` 加 `IsVip`，再把新規則加進 `Library.Borrow`。分類用 `enum` 比字串更安全（不會拼錯）：
+
+```csharp
+enum Category { General, Restricted }   // 一般 / 限定
+
+class Book
+{
+    public string Title { get; }
+    public string Author { get; }
+    public Category Category { get; }            // 新增：分類
+    public bool IsBorrowed { get; private set; }
+
+    public Book(string title, string author, Category category = Category.General)
+    {
+        Title = title;
+        Author = author;
+        Category = category;
+        IsBorrowed = false;
+    }
+
+    public void MarkBorrowed() => IsBorrowed = true;
+    public void MarkReturned() => IsBorrowed = false;
+}
+
+class Member
+{
+    public string Name { get; }
+    public bool IsVip { get; }                    // 新增：是否 VIP
+    private readonly List<Book> _borrowedBooks = new List<Book>();
+    public IReadOnlyList<Book> BorrowedBooks => _borrowedBooks;
+    private const int MaxBooks = 3;
+
+    public Member(string name, bool isVip = false)
+    {
+        Name = name;
+        IsVip = isVip;
+    }
+
+    public bool CanBorrowMore() => _borrowedBooks.Count < MaxBooks;
+    public void AddBook(Book book) => _borrowedBooks.Add(book);
+    public void RemoveBook(Book book) => _borrowedBooks.Remove(book);
+}
+
+class Library
+{
+    private readonly List<Book> _books = new List<Book>();
+    public void AddBook(Book book) => _books.Add(book);
+
+    public bool Borrow(Member member, Book book)
+    {
+        if (book.IsBorrowed)
+        {
+            Console.WriteLine($"《{book.Title}》已被借走");
+            return false;
+        }
+        // 新規則：限定分類只有 VIP 能借
+        if (book.Category == Category.Restricted && !member.IsVip)
+        {
+            Console.WriteLine($"《{book.Title}》為限定書籍，只有 VIP 能借");
+            return false;
+        }
+        if (!member.CanBorrowMore())
+        {
+            Console.WriteLine($"{member.Name} 已達借閱上限");
+            return false;
+        }
+        book.MarkBorrowed();
+        member.AddBook(book);
+        Console.WriteLine($"{member.Name} 借了《{book.Title}》");
+        return true;
+    }
+
+    public void Return(Member member, Book book)
+    {
+        book.MarkReturned();
+        member.RemoveBook(book);
+        Console.WriteLine($"{member.Name} 還了《{book.Title}》");
+    }
+}
+
+// 測試
+var lib = new Library();
+var secret = new Book("機密檔案", "作者", Category.Restricted);
+lib.AddBook(secret);
+var normal = new Member("小明");            // 非 VIP
+var vip = new Member("大戶", isVip: true);   // VIP
+lib.Borrow(normal, secret);   // 為限定書籍，只有 VIP 能借 → false
+lib.Borrow(vip, secret);      // 大戶 借了《機密檔案》 → true
+```
+
+重點：新規則只加在 `Library.Borrow`（業務規則集中的地方），`Book`、`Member` 只新增資料欄位，職責依然清楚。
+
+**第 3 題（重構）：用介面 `IBookRepository` 把「存取」抽出來**
+
+目前 `Library` 把書直接放在記憶體的 `List<Book>`。若未來要存進資料庫，重點是「**別讓 `Library` 綁死存取方式**」——把「怎麼存取書」抽成一個介面，`Library` 只依賴介面（依賴反轉）：
+
+```csharp
+// 1) 定義「能力合約」：怎麼存取書，Library 不需要知道細節
+interface IBookRepository
+{
+    void Add(Book book);
+    Book? FindByTitle(string title);
+    IReadOnlyList<Book> GetAll();
+}
+
+// 2) 現階段用記憶體實作（跟原本行為一樣）
+class InMemoryBookRepository : IBookRepository
+{
+    private readonly List<Book> _books = new List<Book>();
+    public void Add(Book book) => _books.Add(book);
+    public Book? FindByTitle(string title) => _books.FirstOrDefault(b => b.Title == title);
+    public IReadOnlyList<Book> GetAll() => _books;
+}
+
+// 3) 未來要進資料庫，只要再寫一個實作，Library 完全不用改：
+// class SqlBookRepository : IBookRepository { /* 連資料庫 */ }
+
+// 4) Library 依賴「介面」，實作從建構子注入
+class Library
+{
+    private readonly IBookRepository _books;
+
+    public Library(IBookRepository books)   // 注入：不在乎實際是記憶體還是 SQL
+    {
+        _books = books;
+    }
+
+    public void AddBook(Book book) => _books.Add(book);
+
+    public bool Borrow(Member member, Book book)
+    {
+        // ...借閱業務規則不變（同前）...
+        return true;
+    }
+}
+
+// 使用：現在給記憶體版，未來換成 new Library(new SqlBookRepository())
+var library = new Library(new InMemoryBookRepository());
+```
+
+**改善了什麼**：
+- `Library` 只管「借還的業務規則」，不再管「書存哪、怎麼存」——職責更單一（SRP）。
+- 想換成資料庫？寫一個 `SqlBookRepository : IBookRepository`，`Library` 一行都不用改（OCP + DIP）。
+- 想測試 `Library` 的借閱規則？注入一個假的 repository，不用真連資料庫。
+
+這正是 [csharp-9-1] 分層架構的雛形——把「業務邏輯層」和「資料存取層」用介面隔開。→ **[課外讀物 E-7-6] D — 依賴反轉原則**。
+
+</details>
+
 ## 課外讀物
 
 > 整合的原則：封裝、SRP、組合優於繼承 → 複習 [csharp-2-2]、[csharp-2-5]、[課外讀物 E-7](../../../課外讀物/E-7-solid/E-7-1-solid-overview.md)

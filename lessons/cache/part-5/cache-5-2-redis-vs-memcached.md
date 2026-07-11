@@ -127,6 +127,18 @@ redis.hset("user:123", {name: "Alice", age: 30})
 
 用自己的話說明 Redis 和 Memcached 最大的差別（資料結構、功能）。
 
+<details>
+<summary>參考解答</summary>
+
+兩者都是「放在記憶體、超快、給多台應用共享」的 key-value 快取，但最大的差別在**功能豐富度**：
+
+- **Memcached**＝「簡單就是美」。它只是個純粹的 key-value 記憶體儲存，value 只能放簡單的字串/位元組，**沒有複雜資料結構**、**不持久化**（重啟資料全失），功能少但極簡、極快、多執行緒。
+- **Redis**＝「功能豐富的瑞士刀」。除了基本 key-value，還支援 String / Hash / List / Set / Sorted Set 等**多種資料結構**，可以**選擇持久化**（存硬碟、重啟能恢復），還能兼當排行榜、限流器、session 儲存、分散式鎖、訊息佇列。
+
+一句話總結：**Memcached 是單純的 key-value 快取；Redis 是功能強大太多、什麼都能順便做的多用途工具。**
+
+</details>
+
 ---
 
 ### 練習 2：選哪個
@@ -137,11 +149,37 @@ redis.hset("user:123", {name: "Alice", age: 30})
 2. 只要一個超單純的 key-value 快取
 3. 不確定未來需求，想保留彈性
 
+<details>
+<summary>參考解答</summary>
+
+1. **遊戲排行榜 → Redis**。排行榜要「按分數排序、取前 N 名」，正好是 Redis 的 **Sorted Set（有序集合）** 的拿手好戲（`zadd` 加分數、`zrevrange` 取前 10 名）。Memcached 只有純字串，做不到這種排序，得自己在應用層撈全部再排序，又慢又麻煩。
+2. **超單純的 key-value 快取 → Memcached 或 Redis 都可以**。這是 Memcached 唯一真正有優勢的場景（追求極致多核吞吐量、value 大量且簡單）。不過就算是這種需求，實務上多數人還是會直接選 Redis，因為它也能做純 key-value，省得日後要換。
+3. **不確定未來需求 → Redis**。這正是本章的結論：「先用 Redis，需要進階功能時直接有」比「用 Memcached、之後不夠用要換」省事太多。保留彈性就選功能全的那個。
+
+口訣：**不確定就用 Redis。**
+
+</details>
+
 ---
 
 ### 練習 3：Redis 不只是快取
 
 回答：除了當快取，Redis 還能當哪些東西？（至少兩個，提示：排行榜、限流、session…）
+
+<details>
+<summary>參考解答</summary>
+
+因為 Redis 支援豐富的資料結構，它同一個服務就能兼當很多角色，例如：
+
+- **排行榜**：用 Sorted Set（有序集合）按分數排序，`zrevrange` 直接取前 N 名。
+- **計數器 / 限流器（rate limiter）**：用 `incr` 累加，例如記錄「某使用者這分鐘呼叫幾次 API」來做限流（SRE Part 8-2 常用）。
+- **session 儲存**：把使用者登入狀態存在 Redis，多台應用共享。
+- **分散式鎖**：協調多個節點對同一資源的存取。
+- **訊息佇列**：用 List 或 Stream 當簡單的佇列。
+
+共同點：這些都是靠 Redis 的多種資料結構才辦得到，Memcached 的純字串做不到——這也是 Redis 比 Memcached 受歡迎的關鍵原因。
+
+</details>
 
 ## 課外讀物
 

@@ -131,6 +131,24 @@ systemctl list-unit-files --type=service --state=enabled
 
 如果 ssh 不是 enabled，你重開機後會發生什麼事？（提示：想想你還連不連得進來。）
 
+<details>
+<summary>參考解答</summary>
+
+跑 `systemctl status ssh`（有些系統服務名是 `sshd`，看不到就換 `systemctl status sshd`），看輸出最前面那兩行：
+
+```
+● ssh.service - OpenBSD Secure Shell server
+     Loaded: loaded (/lib/systemd/system/ssh.service; enabled; ...)
+     Active: active (running) since ...
+```
+
+1. 看 `Active:` 那行——只要出現 `active (running)`，代表它現在正活著在跑。
+2. 看 `Loaded:` 那行括號裡的字——出現 `enabled` 代表開機會自動啟動，出現 `disabled` 就是不會。
+
+**如果 ssh 不是 enabled 會怎樣？** 現在還連得進來（因為它此刻是 running），但一旦你 `sudo reboot` 重開機，ssh 服務不會自己被拉起來，於是你**再也 SSH 不進這台伺服器**了。對雲端伺服器來說這幾乎等於把自己鎖在門外——你手邊沒有實體鍵盤螢幕，只能靠 SSH。所以 ssh 這種服務一定要 enabled。這也是為什麼多數雲端映像檔預設就幫你把 ssh 設成 enabled。
+
+</details>
+
 ---
 
 ### 練習 2：分清 start 與 enable
@@ -141,6 +159,19 @@ systemctl list-unit-files --type=service --state=enabled
 2. 只有 `systemctl enable`，沒有 `start`
 3. `systemctl enable --now`
 
+<details>
+<summary>參考解答</summary>
+
+關鍵是記住：`start` 管「現在」，`enable` 管「開機以後」，兩者互相獨立。
+
+1. **只有 `start`，沒有 `enable`**：現在有跑，但**重開機後不會自己起來**。因為你只叫它「現在營業」，沒設定「以後開機自動開門」。
+2. **只有 `enable`，沒有 `start`**：現在**沒有在跑**，但重開機後會自動起來。因為你只設定了「以後開機自動開門」，卻沒叫它「現在就營業」。（如果你希望現在也跑，就得再補一個 `sudo systemctl start`。）
+3. **`enable --now`**：現在就有跑，重開機後也會自己起來——因為 `--now` 等於同時做了 `start`（現在啟動）和 `enable`（開機自啟）。這是正式服務最常用的一招。
+
+一句話記法：**`start` 是「這一次」，`enable` 是「每一次」。** 正式服務兩個都要，所以用 `enable --now` 一次搞定。
+
+</details>
+
 ---
 
 ### 練習 3：觀察你的服務總管
@@ -148,6 +179,30 @@ systemctl list-unit-files --type=service --state=enabled
 跑 `systemctl list-unit-files --type=service --state=enabled`，看看你的伺服器開機時會自動拉起哪些服務。挑兩個你認得的，想想它們各自負責什麼。
 
 > 提示：下一章你就要親手「新增一個」屬於你自己的服務到這份名單裡。
+
+<details>
+<summary>參考解答</summary>
+
+這題沒有標準答案，因為每台機器裝的東西不一樣，需要你**自行在自己的伺服器上實機執行**看結果。以一台常見的 Ubuntu 雲端伺服器來說，清單裡通常會看到這些你可能認得的：
+
+```
+UNIT FILE                 STATE
+ssh.service               enabled     ← 遠端登入，你就是靠它連進來的
+cron.service              enabled     ← 排程工作（定時執行任務）
+systemd-timesyncd.service enabled     ← 校時，讓機器時間準確
+ufw.service               enabled     ← 防火牆（Part 3-3 學過）
+```
+
+（如果你已經做過前面章節，可能還會看到 `nginx.service`、`certbot.timer` 等。）
+
+挑兩個舉例說明它們負責什麼：
+
+- **`ssh.service`**：讓你能從自己電腦遠端登入這台伺服器。沒有它，你根本連不進來。
+- **`ufw.service`**：開機時把你設好的防火牆規則套上去，擋掉沒放行的 port。
+
+**驗收點**：確認清單裡有 `ssh`（否則重開機會連不進來，呼應練習 1），並且你能講出至少兩個服務各自的職責。
+
+</details>
 
 ## 課外讀物
 

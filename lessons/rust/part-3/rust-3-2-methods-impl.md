@@ -106,6 +106,63 @@ fn main() {
 2. 給 `Book` 加一個 `&mut self` 的方法 `rate(&mut self, score: f64)`，用來設定評分。在 `main` 建一本 `mut` 的書、評分、印出。
 3. 給 `Book` 寫一個關聯函式 `Book::new(title, pages)`，`rating` 預設 `0.0`，用 `Book::new(...)` 建立實例。
 
+<details>
+<summary>參考解答</summary>
+
+延續上一節的 `Book`，把三個方法都補進同一個 `impl` 區塊：
+
+```rust
+struct Book {
+    title: String,
+    pages: u32,
+    rating: f64,
+}
+
+impl Book {
+    // 第 3 題：關聯函式（沒有 self），像「建構子」
+    fn new(title: String, pages: u32) -> Book {
+        Book {
+            title,
+            pages,
+            rating: 0.0,
+        }
+    }
+
+    // 第 1 題：只讀資料 → 用 &self
+    fn is_long(&self) -> bool {
+        self.pages > 300
+    }
+
+    // 第 2 題：要修改欄位 → 用 &mut self
+    fn rate(&mut self, score: f64) {
+        self.rating = score;
+    }
+}
+
+fn main() {
+    // 第 3 題：用 型別::函式 呼叫關聯函式
+    let short = Book::new(String::from("小書"), 120);
+    let long = Book::new(String::from("大部頭"), 500);
+
+    // 第 1 題：用點呼叫方法
+    println!("《{}》是長書嗎？{}", short.title, short.is_long());  // false
+    println!("《{}》是長書嗎？{}", long.title, long.is_long());    // true
+
+    // 第 2 題：要呼叫 &mut self 的方法，實例本身必須是 mut
+    let mut book = Book::new(String::from("待評分"), 260);
+    book.rate(4.7);
+    println!("《{}》評分：{}", book.title, book.rating);           // 4.7
+}
+```
+
+幾個關鍵：
+
+- **`&self` vs `&mut self`**：`is_long` 只是讀 `pages`，用 `&self`（唯讀借用）；`rate` 要改 `rating`，必須用 `&mut self`（可變借用）。這完全對應 Part 2 的所有權與借用規則。
+- **第 2 題的 `mut`**：想呼叫 `book.rate(...)`，`book` 這個變數本身也要宣告成 `mut`，否則 Rust 不允許對它做可變借用，編譯會失敗。
+- **關聯函式 vs 方法**：`new` 沒有 `self` 參數，屬於型別本身，所以用 `Book::new(...)`（雙冒號）呼叫；`is_long`、`rate` 有 `self`，是方法，用 `實例.方法()` 呼叫。
+
+</details>
+
 ## 課外讀物
 
 > 「資料與操作它的行為放一起、各司其職」呼應封裝與單一職責 → [課外讀物 E-7-2：單一職責原則](../../../課外讀物/E-7-solid/E-7-2-srp.md)

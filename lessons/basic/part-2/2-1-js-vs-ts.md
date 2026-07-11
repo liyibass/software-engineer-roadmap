@@ -231,9 +231,45 @@ function add(a, b) {
 console.log(add(1, "2"))
 ```
 
+<details>
+<summary>參考解答</summary>
+
+這題需要你自己在終端機實機驗證。做法步驟：
+
+1. 建立 `bug.js`，把題目的程式碼貼進去。
+2. 在終端機執行 `node bug.js`。
+
+驗收點：輸出應該是 `12`（字串串接），而不是 `3`。因為 `1 + "2"` 時，JavaScript 看到其中一邊是字串，就把 `+` 當成「字串串接」，先把數字 `1` 轉成 `"1"`，再接上 `"2"`，得到 `"12"`。這正是本章一開始講的「JavaScript 不報錯，卻靜靜給你錯誤答案」的例子。
+
+</details>
+
 **練習 2：用 TypeScript 修復**
 
 把上面的 `bug.js` 改寫成 `fix.ts`，加上正確的型別標注，讓 TypeScript 在你傳錯型別時就報錯。用 `npx tsx fix.ts` 確認它可以正常執行。
+
+<details>
+<summary>參考解答</summary>
+
+把兩個參數都標注成 `number`，回傳值讓 TypeScript 自己推斷（會是 `number`）：
+
+```typescript
+// save as fix.ts
+function add(a: number, b: number) {
+  return a + b
+}
+
+console.log(add(1, 2)) // 3，正確！
+```
+
+現在如果你手癢寫 `add(1, "2")`，TypeScript 會在執行之前就報錯：
+
+```
+Argument of type 'string' is not assignable to parameter of type 'number'.
+```
+
+執行 `npx tsx fix.ts`，確認正常傳兩個數字時輸出 `3`。這題也建議你自己在終端機跑一次感受一下：傳錯型別時，錯誤是在「跑之前」就出現的，而不是像練習 1 那樣默默給你 `"12"`。
+
+</details>
 
 **練習 3：觀察型別推斷**
 
@@ -244,6 +280,24 @@ const population = 2700000
 const isCapital = true
 ```
 把滑鼠移到每個變數名稱上（在 VS Code 裡），確認 TypeScript 有自動推斷出正確的型別。
+
+<details>
+<summary>參考解答</summary>
+
+這題需要你自己在 VS Code 裡把滑鼠移上去實機驗證。做法步驟：
+
+1. 建立 `inference.ts`，貼上題目的三行程式碼。
+2. 把滑鼠游標停在每個變數名稱上，看 VS Code 跳出的提示。
+
+驗收點，你會看到 TypeScript 推斷出的型別分別是：
+
+- `city` → `"Taipei"`
+- `population` → `number`
+- `isCapital` → `boolean`
+
+注意 `city` 會被推斷成更精確的 literal type `"Taipei"`（而不只是 `string`）——這是因為用 `const` 宣告的值不會再變，TypeScript 就把它鎖定成那個具體字串。這幾個變數都沒寫型別標注，TypeScript 卻全都知道型別，這就是「型別推斷」的威力：能推斷的就別手動寫，程式碼更乾淨。
+
+</details>
 
 ---
 

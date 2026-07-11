@@ -156,17 +156,77 @@ async function uploadFile(file) {
 
 回答：「使用者直接上傳到 S3」比「經過你的伺服器再轉存」好在哪？（提示：伺服器負擔、容量）
 
+<details>
+<summary>參考解答</summary>
+
+好在**把「搬大檔案」這件重活從你的伺服器身上卸掉**：
+
+- **省伺服器資源**：「經過伺服器」時，每個上傳的大檔案都要佔用伺服器的頻寬、記憶體、CPU（收檔案 → 暫存 → 再轉存 S3）。使用者一多、檔案一大，伺服器很快就被拖垮。「直接上傳」時，真正的檔案傳輸是「使用者瀏覽器 ↔ S3」直接進行，你的伺服器只做「產生一個 presigned URL」這件超輕量的事。
+- **容量／擴展性更好**（呼應 SRE 的容量規劃）：伺服器不再是檔案流量的瓶頸，同樣一台機器能服務多很多的使用者；要擴充也容易。實際的儲存與頻寬壓力交給 S3（它天生就是為海量存取設計的）。
+- **順帶的好處**：延遲更低（少一次中轉）、成本更省（不用為了扛上傳流量而養大伺服器），而且因為用 presigned URL，**bucket 仍維持私有、安全**。
+
+一句話：伺服器只當「發通行證的櫃台」，不當「搬貨的工人」。這也是業界上傳檔案的標準做法。
+
+</details>
+
 ---
 
 ### 練習 2：安全分析
 
 回答：這個方案怎麼做到「bucket 不公開，但使用者仍能上傳」？presigned URL 的「限時、限定」體現了哪個原則？
 
+<details>
+<summary>參考解答</summary>
+
+**怎麼做到「bucket 私有卻仍能上傳」：**
+
+關鍵是「**授權來自你的後端，不是來自公開 bucket**」。bucket 本身鎖死（誰都不能隨便存取），但你的後端擁有一個**最小權限的 IAM Role**（只允許對這個 bucket `PutObject`）。當使用者要上傳時：
+
+1. 前端跟你的後端要一個上傳網址。
+2. 後端用它的權限「簽發」一個 **presigned URL**——這個網址裡夾帶了一段「臨時、有簽章的授權」，等於後端把「上傳這一個檔案」的權限，暫時、局部地借給持有網址的人。
+3. 前端拿這個 URL 直接 `PUT` 到 S3，S3 驗證簽章有效就收下。
+
+所以使用者不是靠「bucket 公開」才傳得上去，而是靠「後端臨時簽發的授權」——bucket 全程維持私有。而且前端拿到的是**臨時授權網址、不是 AWS 金鑰**，就算被看到，過期也沒用（呼應 aws-1-3 防金鑰外洩）。
+
+**體現的原則：最小權限原則（aws-2-2）。** presigned URL 的「限時、限定」把授權縮到剛好夠用：只能**上傳**（不能讀、不能刪）、只能傳**這個檔名/key**、只在**這 5 分鐘內**有效，過期作廢。同時後端那個 Role 也只有 `PutObject` 一項權限——從頭到尾都只給「完成這件事所需的最小授權」，不多給一分。
+
+</details>
+
 ---
 
 ### 練習 3：實作（進階）
 
 如果你有 AWS 帳號和一點程式基礎，試著實作這個流程：建私有 bucket、給後端最小權限、產生 presigned URL、用它上傳一個檔案。驗證「bucket 私有、但能透過 URL 上傳成功」。
+
+<details>
+<summary>參考解答</summary>
+
+> 這是動手題，以下是做法與驗收點。**請自行在你的 AWS 帳號實機操作驗證**——本解答不代替你實際跑過（也提醒：練習完記得清掉資源，避免留著忘記）。
+
+**做法（依本章步驟）：**
+
+1. **建私有 bucket**：S3 → Create bucket，取一個全球唯一的名字（如 `my-app-uploads-你的後綴`），**保持預設的 Block Public Access 全開**（維持私有）。
+2. **給後端最小權限**：建一個 IAM Role（本機測試也可先用一個只給此政策的 IAM User 拿臨時憑證），只掛本章那段只允許 `s3:PutObject` 到 `arn:aws:s3:::my-app-uploads-你的後綴/*` 的政策——不給讀、不給刪、不碰別的 bucket。
+3. **產生 presigned URL**：用本章的 Node 範例（`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`），對 `PutObjectCommand` 呼叫 `getSignedUrl`，設 `expiresIn: 300`（5 分鐘），region 對到你 bucket 的 region。
+4. **用 URL 上傳**：快速驗證可以直接用 curl（不寫前端也行）：
+
+   ```bash
+   # 把 <PRESIGNED_URL> 換成上一步印出來的網址
+   curl -X PUT --upload-file ./test.txt "<PRESIGNED_URL>"
+   ```
+
+   或用本章前端範例的 `fetch(url, { method: "PUT", body: file })`。
+
+**驗收點（怎麼算成功）：**
+
+- **上傳成功**：curl/fetch 回 **HTTP 200**；到 S3 Console 看該 bucket，`uploads/test.txt` 出現了。
+- **bucket 確實是私有**：直接用瀏覽器打該物件的公開網址（`https://<bucket>.s3.<region>.amazonaws.com/uploads/test.txt`）應該回 **403 AccessDenied**——證明「沒有那張 presigned 通行證就進不去」。
+- **過期會失效**：等超過 5 分鐘後，再用同一個 URL PUT，應該被拒（`403`，訊息類似 `Request has expired`）——證明限時有效。
+- **權限最小**：試著把 URL 改成 `GetObject`（或用只給 PutObject 的憑證去 `GetObject`）應失敗——證明後端只有上傳、沒有讀取權限。
+
+四點都符合，就代表你做出了「bucket 私有、但能透過限時 URL 安全上傳」的標準架構。
+
+</details>
 
 ## 課外讀物
 

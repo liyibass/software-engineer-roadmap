@@ -247,6 +247,55 @@ response.json([...])        → 回 JSON，並自動加上 Content-Type: applica
 
 **練習 3**：故意把 `app.listen` 那行的 `PORT` 改成一個已經被佔用的埠號（例如把另一個伺服器也設成 3000），跑跑看會發生什麼錯誤訊息？讀讀那段錯誤，它在告訴你什麼？（提示：關鍵字 `EADDRINUSE`——address in use，位址已被使用。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**（需自行實機驗證）
+
+做法：`npm run dev` 啟動伺服器後，開**另一個**終端機視窗跑 `curl http://localhost:3000`，同時用瀏覽器打開 `http://localhost:3000`。
+
+驗收點：兩種方式都應該看到同一句「哈囉，我是你的第一個後端伺服器！」。這證明「不管誰來問（瀏覽器 / curl），只要是 `GET /`，伺服器都回同一個處理函式的結果」。
+
+**練習 2**
+
+在原本的 `server.ts` 裡，`app.get("/", ...)` 下面新增一條 `/hello` 路由：
+
+```typescript
+import express from "express"
+
+const app = express()
+const PORT = 3000
+
+app.get("/", (request, response) => {
+  response.send("哈囉，我是你的第一個後端伺服器！")
+})
+
+// 新增：GET /hello 回傳你的名字
+app.get("/hello", (request, response) => {
+  response.send("我是 Liyi")
+})
+
+app.listen(PORT, () => {
+  console.log(`伺服器已啟動，正在 http://localhost:${PORT} 待命`)
+})
+```
+
+驗收點：因為用了 `tsx watch`，存檔後伺服器會自動重啟。用瀏覽器開 `http://localhost:3000/hello`，應該看到你填的名字。
+
+**練習 3**（需自行實機驗證）
+
+做法：把 `PORT` 改成一個已被佔用的埠號（最直接的方式是：讓原本的伺服器繼續跑，再開一個新的、同樣設 `3000` 的伺服器）。
+
+驗收點：第二支伺服器啟動時會崩潰，終端機印出類似這樣的錯誤：
+
+```
+Error: listen EADDRINUSE: address already in use :::3000
+```
+
+它在告訴你：**3000 號房已經有人住了**。一個埠號同一時間只能被一支程式綁定，作業系統不知道請求進來要交給誰，所以直接拒絕第二支綁定。解法是換一個沒被佔用的埠號（例如改成 `3001`），或先把佔用 3000 的那支程式停掉（`Ctrl + C`）。
+
+</details>
+
 ---
 
 ## 課外讀物

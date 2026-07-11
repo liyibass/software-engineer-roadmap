@@ -173,6 +173,111 @@ builder.Services.AddScoped<TodoService>();
 2. 為 Repository 定義介面 `ITodoRepository`，讓 Service 依賴介面而非具體實作。
 3. 思考題：分層架構怎麼讓「測試業務邏輯」變容易？（提示：Service 依賴介面 → 測試時能注入什麼？）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（動手題）：重構成三層。**
+
+做法是把原本擠在 Controller 的三件事拆開：Controller 只留 HTTP 相關（取 userId、回狀態碼），業務規則搬到 Service，所有 EF Core 操作搬到 Repository。核心結構就是本章範例的樣子：
+
+```csharp
+// Repository：只碰資料庫
+public class TodoRepository : ITodoRepository
+{
+    private readonly AppDbContext _db;
+    public TodoRepository(AppDbContext db) => _db = db;
+
+    public Task<List<TodoItem>> GetByUserAsync(int userId)
+        => _db.Todos.Where(t => t.UserId == userId).ToListAsync();
+    public Task<TodoItem?> FindByIdAsync(int id)
+        => _db.Todos.FindAsync(id).AsTask();
+    public async Task AddAsync(TodoItem todo)
+    {
+        _db.Todos.Add(todo);
+        await _db.SaveChangesAsync();
+    }
+    public async Task DeleteAsync(TodoItem todo)
+    {
+        _db.Todos.Remove(todo);
+        await _db.SaveChangesAsync();
+    }
+}
+
+// Service：只放業務規則
+public class TodoService
+{
+    private readonly ITodoRepository _repo;
+    public TodoService(ITodoRepository repo) => _repo = repo;
+
+    public Task<List<TodoItem>> GetUserTodosAsync(int userId)
+        => _repo.GetByUserAsync(userId);
+
+    public async Task<TodoItem> AddAsync(int userId, string title)
+    {
+        // 業務規則：標題不可空白
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ValidationException("標題不可為空");
+        var todo = new TodoItem { UserId = userId, Title = title, IsDone = false };
+        await _repo.AddAsync(todo);
+        return todo;
+    }
+}
+
+// Controller：只碰 HTTP
+[Authorize]
+[ApiController]
+[Route("api/todos")]
+public class TodosController : ControllerBase
+{
+    private readonly TodoService _service;
+    public TodosController(TodoService service) => _service = service;
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var userId = GetCurrentUserId();
+        var todos = await _service.GetUserTodosAsync(userId);
+        return Ok(todos.Select(t => new TodoDto(t.Id, t.Title, t.IsDone)));
+    }
+}
+```
+
+別忘了在 `Program.cs` 註冊：`AddScoped<ITodoRepository, TodoRepository>()` 與 `AddScoped<TodoService>()`。
+
+**驗收點**：Controller 裡看不到任何 `AppDbContext`／SQL；Service 裡看不到任何 `IActionResult`／狀態碼；三層各自「純粹」。實際能不能跑、API 行為對不對，請自行啟動專案打 API 驗證。
+
+**第 2 題（動手題）：定義 `ITodoRepository` 介面。**
+
+關鍵是讓 Service 建構子的參數型別是「介面」而非「具體類別」：
+
+```csharp
+public interface ITodoRepository
+{
+    Task<List<TodoItem>> GetByUserAsync(int userId);
+    Task<TodoItem?> FindByIdAsync(int id);
+    Task AddAsync(TodoItem todo);
+    Task DeleteAsync(TodoItem todo);
+}
+
+// Service 依賴「介面」，不依賴 TodoRepository 這個具體實作
+public TodoService(ITodoRepository repo) => _repo = repo;   // ✅
+// public TodoService(TodoRepository repo)                  // ❌ 綁死具體實作
+```
+
+這就是 DIP（依賴反轉，[csharp-2-5]）：高層的 Service 不依賴低層的 EF Core 實作，兩者都依賴介面這個「抽象」。**驗收點**：把 `TodoService` 建構子參數改成介面後，`Program.cs` 的 `AddScoped<ITodoRepository, TodoRepository>()` 仍讓 DI 正常注入、程式能跑。
+
+**第 3 題（思考題）：分層怎麼讓測試變容易？**
+
+因為 Service 依賴的是 `ITodoRepository` 這個「介面」，測試時就能注入一個「假的 Repository」（Mock 或手寫的 Fake），而不必連真的資料庫。
+
+- 測試時注入的是「假 Repository」——你可以事先安排它「回傳什麼」（例如讓 `FindByIdAsync` 回傳一個 UserId 不同的待辦），藉此驗證 Service 的業務規則（如「非本人又非 admin 就丟 ForbiddenException」）。
+- 不碰真資料庫 → 測試**快**（沒有網路／磁碟 IO）、**穩**（不受資料庫狀態影響）、**可重複**。
+- 你測的是「純業務邏輯」，不會連帶被 HTTP、EF Core 的細節干擾。
+
+一句話：**「依賴介面」讓你能在測試時把真實依賴換成可控的假貨**，這正是 [csharp-8-2] Mock 能運作的前提。好架構讓測試容易，就是這個道理。
+
+</details>
+
 ## 課外讀物
 
 > 分層架構、Repository 模式 → **basic 課程 Part 4-D**、[課外讀物 E-12-3：Repository 模式](../../../課外讀物/E-12-design-patterns/E-12-3-repository.md)、[課外讀物 E-12-9：資料存取層](../../../課外讀物/E-12-design-patterns/E-12-9-dal-concept.md)

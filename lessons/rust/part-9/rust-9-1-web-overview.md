@@ -97,6 +97,57 @@ serde = { version = "1", features = ["derive"] }
 2. 建立 `todo_api` 專案並 `cargo add` 上面三個 crate，打開 `Cargo.toml` 確認依賴都在。
 3. 查一下：Axum 和 Actix Web 各被哪些公司/專案使用？（搜尋「Axum production」）感受 Rust 後端的真實應用。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（概念）**
+
+Web 後端是典型的「IO 密集」場景：一個請求的生命週期裡，CPU 真正在算的時間很短，大部分時間都花在「等」——等資料庫回查詢結果、等外部 API 回應、等網路把資料傳完。
+
+如果採「每個請求開一個執行緒傻等」：
+
+- 每條作業系統執行緒都很貴（各要一塊記憶體堆疊、切換時要儲存/還原狀態）。
+- 大部分執行緒其實都卡在「等 IO」的狀態，白白占著資源卻沒在做事。
+- 連線一多（幾千、幾萬個同時連線），執行緒數量就爆掉，記憶體吃光、切換成本壓垮系統。
+
+非同步的做法（呼應 [rust-8-5] 的服務生比喻）：一個執行緒遇到「要等」的操作時，不會傻站著，而是**把這件事掛起來、先去招呼別的請求**，等 IO 好了再回來繼續。這樣**用少少幾條執行緒，就能同時招呼海量『主要在等待』的連線**，記憶體省、吞吐高。這正是 Tokio 在 Axum 底下做的事。
+
+一句話總結：後端大部分時間在等 IO，非同步讓執行緒「等的時候去做別的事」，才能用少量資源扛高並發。
+
+**第 2 題（動手，需自行實機驗證）**
+
+做法：
+
+```bash
+cargo new todo_api
+cd todo_api
+cargo add axum
+cargo add tokio --features full
+cargo add serde --features derive
+```
+
+驗收點：打開 `Cargo.toml`，`[dependencies]` 底下應出現類似：
+
+```toml
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+```
+
+（版本號會隨你安裝當下的最新版而不同，重點是三個 crate 都在、features 正確。）此題需在你自己的機器上實際跑過確認。
+
+**第 3 題（開放查詢，需自行查證）**
+
+這題重點在「感受真實應用」，沒有標準答案，示範方向：
+
+- **Axum**：由 Tokio 官方團隊維護，因為和整個 Tokio 非同步生態（`tower`、`hyper`）天然整合，近年被大量新專案採用，是 Rust 社群目前學習與新建服務的熱門首選。搜尋時可留意它在各家公司內部服務、開源專案（如區塊鏈節點、AI 推論服務的 API 層）的採用。
+- **Actix Web**：老牌框架，長年在 TechEmpower 這類公開的 Web 框架效能評測中名列前茅，以「極高效能」著稱，被不少對吞吐量要求高的服務採用。
+
+檢查清單：你至少能講出「Axum 現代、生態整合好」「Actix 老牌、效能標竿」的差異，並各舉一個看到的實際使用案例即可。
+
+</details>
+
 ## 課外讀物
 
 > 一個 HTTP 請求從瀏覽器到後端的完整旅程 → [課外讀物 E-3：網路通訊基礎](../../../課外讀物/E-3-network/E-3-1-how-internet-works.md)、**basic 課程 Part 4**

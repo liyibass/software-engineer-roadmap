@@ -161,11 +161,55 @@ docker compose ps
 
 照本章步驟，用 Docker Compose 把 Prometheus + Grafana + node_exporter 跑起來，在 Grafana 匯入 1860 儀表板，看到你伺服器的即時指標。
 
+<details>
+<summary>參考解答</summary>
+
+這題是整章的實作，最終要親眼在 Grafana 看到儀表板才算完成，請自行在你的機器上驗證。把本章五步驟串起來的完整流程與各步的驗收點：
+
+1. **建目錄與檔案**
+   ```bash
+   mkdir -p ~/infra-practice/monitoring
+   cd ~/infra-practice/monitoring
+   ```
+   在裡面放好 `prometheus.yml`（scrape 設定，targets 指向 `node_exporter:9100`）和 `docker-compose.yml`（三個服務）。
+
+2. **一鍵啟動並確認**
+   ```bash
+   docker compose up -d
+   docker compose ps
+   ```
+   **驗收點**：`node_exporter`、`prometheus`、`grafana` 三個容器都是 `running`（或 `Up`）。若有容器一直重啟，用 `docker compose logs <服務名>` 看錯誤——最常見是 `prometheus.yml` 縮排寫錯（YAML 對縮排很敏感）。
+
+3. **確認 Prometheus 有抓到 node_exporter**（可選但很有用）：瀏覽器開 `http://localhost:9090`，進 Status → Targets，看到 `node` 這個 job 是 **UP** 就代表抓通了。
+
+4. **進 Grafana 接資料來源**：開 `http://localhost:3000`，用 `admin`/`admin` 登入並改密碼 → Connections → Data sources → 加 Prometheus → URL 填 `http://prometheus:9090`（用服務名，因為它們在同一個 compose 網路裡）→ Save & test 出現綠色成功。
+
+5. **匯入儀表板**：Dashboards → New → Import → 填 `1860`（Node Exporter Full）→ Load → 選剛才的 Prometheus 資料來源 → Import。
+
+**最終驗收點**：你看到一個滿滿的主機監控儀表板，CPU、記憶體、磁碟、網路都有即時的圖在動。這就代表整套監控成功跑起來了。
+
+小提醒：如果是架在 EC2 而不是本機 WSL，記得安全群組／防火牆放行 3000（Grafana）才能從你的瀏覽器連進去；純本機練習用 `localhost` 則不需要。
+
+</details>
+
 ---
 
 ### 練習 2：圖文對照
 
 在 Grafana 儀表板找到「記憶體使用」的圖，同時在終端機跑 `free -h`。比對兩邊的數字對不對得上。體會：同一個指標，一個是「此刻一個數字」，一個是「會動的歷史曲線」。
+
+<details>
+<summary>參考解答</summary>
+
+這題要實機對照，結果以你機器上的數字為準，請自行驗證。做法與判讀：
+
+1. 在 1860 儀表板往下找記憶體相關的面板（常見標題是 **Memory Basic** 或 **Memory Usage**），看它「此刻」的已用 / 可用值。
+2. 同時在終端機跑 `free -h`，看 `used`、`available` 那幾個數字。
+3. **驗收點**：兩邊的「已用記憶體」數量級應該對得上（例如都是約 1.2GB 上下）。不會百分之百一模一樣，因為：Grafana 的點是「幾秒前抓的那一刻」，`free` 是「你敲下去的這一刻」，中間記憶體本來就在變動；另外兩邊對「可用記憶體」的算法可能略有差異（要不要把 cache/buffer 算成可用）。只要量級一致、趨勢合理，就算對得上。
+
+要體會的重點：**同一個「記憶體使用」指標，`free -h` 給你的是「此刻一個死的數字」，Grafana 給你的是「一條會隨時間移動的曲線」。** 後者的價值在於——你不只知道現在多少，還能看到它過去怎麼變、往哪個方向走。這正是自動監控相對於手動指令最核心的加值。
+
+</details>
 
 ---
 
@@ -179,6 +223,27 @@ yes > /dev/null
 ```
 
 `yes > /dev/null` 會讓一顆 CPU 滿載。觀察 Grafana 的 CPU 圖在幾秒內竄高，停掉後又降回來。**你親眼看到了監控系統「即時反映系統狀態」的威力。**
+
+<details>
+<summary>參考解答</summary>
+
+這題要實機操作看圖反應，請自行在你的機器上驗證。做法與觀察重點：
+
+1. 先在 Grafana 開著 1860 儀表板的 CPU 面板（例如 **CPU Basic**），讓它保持在「即時」範圍（右上角時間選近 5~15 分鐘、開自動刷新）。
+2. 在終端機跑 `yes > /dev/null` 製造負載。`yes` 這個指令會瘋狂輸出 `y`，全部丟進 `/dev/null`（黑洞）丟掉，效果就是讓一顆 CPU 核心跑滿。
+   ```bash
+   yes > /dev/null      # 跑幾秒
+   # 按 Ctrl+C 停掉
+   ```
+3. **觀察 / 驗收點**：跑起來後幾秒到十幾秒內（受 `scrape_interval: 15s` 影響，圖有幾秒延遲很正常），Grafana 的 CPU 使用率曲線會**明顯往上竄**；按 Ctrl+C 停掉後，曲線又會**降回原本的低點**，形成一個清楚的「小山丘」。
+
+補充玩法：
+- 若機器多核，一個 `yes` 只吃滿一顆，總使用率可能只升一部分。想吃滿多顆可以開幾個：`yes > /dev/null & yes > /dev/null &`，玩完記得用 `kill %1 %2` 或 `killall yes` 全部收掉，別讓它一直在背景燒 CPU。
+- 你也能同時開 `top`，會看到 `yes` 這支程式的 CPU% 衝到接近 100，和 Grafana 的圖互相印證。
+
+要體會的重點：你「動手改變了系統狀態」，監控系統「幾秒內就忠實反映出來」——這就是有了觀測能力後，你能即時看見系統在發生什麼的威力。
+
+</details>
 
 > 提示：你現在有了「觀測」能力——能看到系統發生什麼。但「看到問題」之後呢？怎麼確保系統就算出事也能撐住、能還原？這就是下一個 Part 8（可靠性與安全：備份、加固、災難復原）要回答的。
 

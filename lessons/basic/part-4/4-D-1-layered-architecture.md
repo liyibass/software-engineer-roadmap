@@ -213,6 +213,65 @@ app.post("/todos", todoController.create)
 
 **練習 3**：假設老闆說「我們要把資料從陣列換成真的資料庫」。在分層架構下，你需要改哪一層？哪些層完全不用動？（這題答對了，你就懂分層的精髓了。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**
+
+依「每一層只做自己的事」補出三層。重點：Repository 只碰資料、Service 只做規則、Controller 只翻譯 HTTP。
+
+```typescript
+// todo.repository.ts —— 只管資料
+remove(id: number): boolean {
+  const index = todos.findIndex((todo) => todo.id === id)
+  if (index === -1) {
+    return false // 找不到，回報「沒刪到」，但不決定要回什麼狀態碼（那是上層的事）
+  }
+  todos.splice(index, 1)
+  return true
+}
+```
+
+```typescript
+// todo.service.ts —— 只管商業邏輯
+deleteTodo(id: number): void {
+  const deleted = todoRepository.remove(id)
+  if (!deleted) {
+    // 規則沒過（要刪的東西不存在），往上拋，由 Controller 翻成 HTTP
+    throw new Error("找不到這筆待辦")
+  }
+}
+```
+
+```typescript
+// todo.controller.ts —— 只管 HTTP
+remove(request: Request, response: Response): void {
+  try {
+    const id = Number(request.params.id)
+    todoService.deleteTodo(id)
+    response.status(204).send() // 刪除成功、無內容回傳
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "刪除失敗"
+    response.status(404).json({ error: message })
+  }
+}
+```
+
+各層界線：Repository 回傳 `true/false` 但**不決定狀態碼**；Service 判斷「刪不到算不算錯」這條規則、用 `throw` 表達；Controller 才把「HTTP 的 id 字串轉成 number」「成功回 204、失敗回 404」這些 HTTP 的事做掉。
+
+**練習 2**
+
+- **「文字不能超過 100 字」→ 寫在 Service。** 這是一條「怎樣才算合法的一筆待辦」的商業規則，跟「文字不可為空」是同一類，屬於 Service 的職責。放這裡，不管是 HTTP 進來還是之後有別的入口（例如排程、CLI）新增待辦，規則都一體適用。
+- **「找不到時回 404」→ 寫在 Controller。** 「404」是 HTTP 的概念，屬於「把結果翻譯成 HTTP 回應」這件事。Service 只負責用 `throw`（或回傳值）表達「這筆不存在」這個**事實**，至於這個事實要對應成哪個狀態碼（404）是 Controller 的工作。這樣 Service 才能保持「不認識 HTTP」，才好單獨測試。
+
+**練習 3**
+
+只需要改 **Repository 這一層**（把「操作陣列」換成「操作資料庫」，例如改用 SQL 或 ORM）。**Controller 和 Service 完全不用動**——因為它們只透過 `todoRepository.findAll()`、`todoRepository.create()` 這些方法名在跟資料層溝通，根本不在乎底下是陣列還是資料庫，只要這些方法的「輸入輸出長相」不變，上層就毫無感覺。
+
+這正是分層的精髓：把「會變的實作細節」（資料存在哪）鎖在一層之內，變動不會外溢。這也是為什麼 V6 從陣列換成資料庫時會輕鬆得不可思議。（背後的原理是「依賴的是介面、不是具體實作」，也就是依賴反轉原則。）
+
+</details>
+
 ---
 
 ## 課外讀物

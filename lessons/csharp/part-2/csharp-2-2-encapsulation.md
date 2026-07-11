@@ -143,6 +143,111 @@ Console.WriteLine($"{todo.Title} 完成={todo.IsDone} 建立於={todo.CreatedAt}
 2. 把 `Pages` 改成「有驗證的屬性」：`set` 時若頁數 ≤ 0 就丟例外。
 3. 加一個 `bool IsBorrowed { get; private set; }`，只能透過 `Borrow()` / `Return()` 方法改，測試外界無法直接設它。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用自動屬性改寫 `Title`、`Author`、`Pages`**
+
+自動屬性 `{ get; set; }` 讓編譯器自動幫你產生背後的私有欄位，不用手寫 `_title` 那些：
+
+```csharp
+class Book
+{
+    public string Title { get; set; }
+    public string Author { get; set; }
+    public int Pages { get; set; }
+
+    public Book(string title, string author, int pages)
+    {
+        Title = title;
+        Author = author;
+        Pages = pages;
+    }
+}
+```
+
+用起來和欄位一模一樣（`book.Title = "..."`），但它其實是「受控的存取點」，之後想加驗證隨時能升級成完整屬性——這正是第 2 題要做的。
+
+**第 2 題：把 `Pages` 改成有驗證的屬性**
+
+當一個屬性需要驗證，就從自動屬性展開成「有 `private` 欄位 + 完整 `get`/`set`」的寫法，在 `set` 裡擋掉不合理的值：
+
+```csharp
+class Book
+{
+    public string Title { get; set; }
+    public string Author { get; set; }
+
+    private int _pages;
+    public int Pages
+    {
+        get { return _pages; }
+        set
+        {
+            if (value <= 0)      // value 是外界要設的新值
+                throw new ArgumentException($"頁數必須大於 0，收到的是 {value}");
+            _pages = value;
+        }
+    }
+
+    public Book(string title, string author, int pages)
+    {
+        Title = title;
+        Author = author;
+        Pages = pages;           // 走 set，一樣會被驗證
+    }
+}
+
+// 測試
+var book = new Book("正常書", "作者", 300);   // OK
+// var bad = new Book("壞書", "作者", -5);   // 丟例外：頁數必須大於 0
+```
+
+注意連建構子裡的 `Pages = pages` 也會經過 `set` 的驗證，所以「一開始就給錯的值」也擋得住。
+
+**第 3 題：加只能由內部改的 `IsBorrowed`**
+
+用 `{ get; private set; }` 讓外界只能讀不能寫，狀態只能透過 `Borrow()` / `Return()` 這兩個方法改：
+
+```csharp
+class Book
+{
+    public string Title { get; set; }
+    public string Author { get; set; }
+    public int Pages { get; set; }
+    public bool IsBorrowed { get; private set; }   // 外界只能讀
+
+    public Book(string title, string author, int pages)
+    {
+        Title = title;
+        Author = author;
+        Pages = pages;
+        IsBorrowed = false;
+    }
+
+    public void Borrow()
+    {
+        IsBorrowed = true;
+    }
+
+    public void Return()
+    {
+        IsBorrowed = false;
+    }
+}
+
+var book = new Book("深入淺出 C#", "作者", 420);
+book.Borrow();
+Console.WriteLine(book.IsBorrowed);   // True（讀得到）
+book.Return();
+Console.WriteLine(book.IsBorrowed);   // False
+// book.IsBorrowed = true;            // ❌ 編譯錯誤！set 是 private，外界不能直接設
+```
+
+最後那行如果解除註解會直接編譯失敗——這正是封裝的目的：把「怎麼改狀態」的控制權收回物件自己手上。這裡的 `Borrow()`/`Return()` 各只做一件事 → **[課外讀物 E-7-2] S — Single Responsibility Principle**。
+
+</details>
+
 ## 課外讀物
 
 > 封裝 = 抽象、最小暴露 → **cs 課程 Part 8-1**、[課外讀物 E-7-5：介面隔離](../../../課外讀物/E-7-solid/E-7-5-isp.md)

@@ -155,6 +155,30 @@ chmod +x ~/infra-practice/healthcheck.sh
 
 建立一個 `hello.sh`，用變數存你的名字，再用 `echo` 印出問候語。記得加 shebang、`chmod +x`，然後執行它。
 
+<details>
+<summary>參考解答</summary>
+
+先建立檔案 `vi hello.sh`，寫入：
+
+```bash
+#!/bin/bash
+NAME="Alice"
+echo "Hello, $NAME! 歡迎來到 infra 的世界"
+```
+
+三個必備要素都在：第一行的 shebang `#!/bin/bash` 告訴系統用 bash 執行；`NAME="Alice"` 是變數（記得等號兩邊不能有空格）；用的時候前面加 `$` 變成 `$NAME`。
+
+接著給執行權限並跑起來：
+
+```bash
+chmod +x hello.sh
+./hello.sh
+```
+
+會印出 `Hello, Alice! 歡迎來到 infra 的世界`。注意執行時要寫 `./hello.sh`（前面的 `./` 代表「當前資料夾裡的這個檔案」），只打 `hello.sh` 系統會找不到。
+
+</details>
+
 ---
 
 ### 練習 2：踩雷與排雷
@@ -167,6 +191,21 @@ NAME = "Alice"
 
 > 提示：回想「等號兩邊」的規則。
 
+<details>
+<summary>參考解答</summary>
+
+問題出在**等號兩邊有空格**。在 shell 裡，`NAME = "Alice"` 不會被當成「賦值」，而是被當成「執行一個叫 `NAME` 的指令，並帶兩個參數 `=` 和 `Alice`」——因為 shell 用空格來分隔指令和參數。結果通常是 `NAME: command not found`。
+
+shell 的賦值語法很嚴格：**等號緊貼變數名和值，兩邊都不能有空格**。正確寫法是：
+
+```bash
+NAME="Alice"
+```
+
+這也是新手最常踩的雷。跟 basic 課程裡 `const name = "Alice"`（等號兩邊要有空格）剛好相反，很容易記混，多寫幾次就習慣了。
+
+</details>
+
 ---
 
 ### 練習 3：擴充健康檢查腳本
@@ -174,6 +213,35 @@ NAME = "Alice"
 在上面的 `healthcheck.sh` 加一段，檢查「磁碟使用率有沒有超過 80%，超過就印警告」。
 
 > 提示：可以用 `df` 搭配文字處理工具取出百分比數字，再用 `if [ 數字 -gt 80 ]` 判斷（`-gt` = greater than）。這題有挑戰性，查資料、試錯都是學習的一部分。
+
+<details>
+<summary>參考解答</summary>
+
+在 `healthcheck.sh` 的磁碟區塊後面，加上這一段：
+
+```bash
+# 4. 磁碟使用率超過 80% 就警告
+echo "--- 磁碟使用率檢查 ---"
+DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | tr -d '%')
+if [ "$DISK_USAGE" -gt 80 ]; then
+    echo "⚠️  警告：磁碟使用率已達 ${DISK_USAGE}%，該清理了！"
+else
+    echo "✅ 磁碟使用率 ${DISK_USAGE}%，還算健康"
+fi
+```
+
+一步步拆解怎麼取出那個數字：
+
+- `df /`：查根目錄的磁碟使用狀況，會印出兩行（標題列 + 資料列）。
+- `tail -1`：只取最後一行（真正的資料那行），甩掉標題列。
+- `awk '{print $5}'`：印出第 5 欄，也就是「使用率百分比」欄（例如 `73%`）。
+- `tr -d '%'`：把 `%` 符號刪掉，只留下純數字 `73`——因為 `-gt` 是數字比較，字串裡有 `%` 會出錯。
+
+`$(...)` 是指令替換，把整串處理完的結果存進 `DISK_USAGE` 變數。最後用 `if [ "$DISK_USAGE" -gt 80 ]` 判斷（`-gt` = greater than，數字大於）。變數加雙引號是好習慣，避免變數為空時語法爆掉。
+
+驗收：跑 `./healthcheck.sh`，會多出一段磁碟使用率的判斷。想測「超標」的情況，可以暫時把 `80` 改成一個比目前使用率還低的數字（例如 `10`），確認警告訊息真的會跳出來，再改回 `80`。
+
+</details>
 
 ## 課外讀物
 

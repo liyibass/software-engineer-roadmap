@@ -94,6 +94,48 @@ dotnet publish -c Release --self-contained -r linux-x64
 2. 用 `dotnet MyApi.dll` 執行發佈後的產物，確認能跑。
 3. 思考題：為什麼部署要用 Release 而非 Debug 版？「框架相依」和「自包含」各適合什麼情境？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1（動手做）**：在你的 API 專案根目錄（有 `.csproj` 的地方）執行：
+
+```bash
+dotnet publish -c Release -o ./publish
+```
+
+跑完後看 `publish` 資料夾，你大致會看到：
+
+- `MyApi.dll`：你的應用主體（編譯後的中介語言，不是原始碼 `.cs`）。
+- `MyApi.exe`（Windows）或無副檔名的可執行檔（自包含時才有）：啟動器。
+- `appsettings.json`、`appsettings.Production.json`：設定檔（csharp-4-5）。
+- `MyApi.deps.json`：描述這個應用依賴哪些套件。
+- `MyApi.runtimeconfig.json`：告訴 runtime 該用哪個 .NET 版本、參數。
+- 一堆第三方套件的 `.dll`（EF Core、JWT 套件等）。
+- 靜態檔（若有 `wwwroot`）。
+
+驗收點：資料夾裡看得到 `MyApi.dll` 跟一批 `.dll`，且**沒有** `bin/`、`obj/`、`.cs` 原始碼。這一步需自行實機驗證。
+
+**練習 2（動手做）**：
+
+```bash
+cd publish
+dotnet MyApi.dll
+```
+
+驗收點：終端機出現 `Now listening on: http://localhost:5000`（或你設定的埠）之類的訊息，表示發佈產物能獨立跑起來。用瀏覽器或 `curl` 打一個端點確認有回應。注意這裡是用 `dotnet MyApi.dll` 執行「發佈後的 DLL」，不是 `dotnet run`（那是開發用、會重新編譯）。這一步需自行實機驗證。
+
+**練習 3（思考題）**：
+
+- **為什麼用 Release 而非 Debug？** Debug 版保留完整除錯資訊、且**不做最佳化**，是為了方便你邊跑邊除錯；代價是跑得慢、檔案大，而且除錯符號可能洩漏內部實作細節。Release 版做了最佳化、去掉多餘除錯資訊，跑得快又精簡，正是上線該有的樣子。用 Debug 版上線 = 又慢又可能洩漏資訊，是常見的低級失誤。
+
+- **框架相依（framework-dependent）適合**：你能掌控目標機器、確定上面裝了對應版本的 .NET Runtime 的情境（例如公司內部標準化的伺服器、或用 Docker 時 base image 已含 runtime）。優點是產物小、多個 app 可共用同一份 runtime、runtime 有安全更新時不用重發你的 app。
+
+- **自包含（self-contained）適合**：無法保證目標機器有 .NET、或不想在機器上裝 runtime 的情境（例如交付給客戶的獨立執行檔、或環境很雜的舊機器）。優點是「目標機器什麼都不用裝」；代價是產物大很多，而且 runtime 的安全更新要靠你重新發佈。
+
+補充：現代部署常直接用 Docker（csharp-10-2），把 runtime 打包進 image，就繞過了「目標機器裝了沒」這個問題，所以很多時候用「框架相依 + 含 runtime 的 base image」是最省事的組合。
+
+</details>
+
 ## 課外讀物
 
 > 對照 Rust 的 release 發佈 → **rust 課程 [rust-9-6]**；編譯最佳化 → **cs 課程 Part 4-3**

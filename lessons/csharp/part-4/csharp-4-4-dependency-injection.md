@@ -143,6 +143,98 @@ Web 後端最常用 Scoped——「每個請求一個獨立實例」，
 2. 定義一個介面 `IGreeter` 和兩個實作，註冊其中一個，在一個 Controller 注入並使用。試著「只改註冊那行」換成另一個實作。
 3. 思考題：為什麼「依賴介面 + 從外注入」讓測試變容易？（提示：測試時能注入什麼？）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用「自己發電 vs 插座供電」解釋 DI 解決的問題**
+
+「自己發電」= 每個類別自己 `new` 依賴（如 `new SqlUserRepository()`）。就像每個家電都自帶一台發電機——結果是：跟具體實作綁死（想換別的電源就得拆機器改程式碼）、難測試（測試時被迫用「真的發電機」、真的連資料庫）、還要自己負責一路把依賴的依賴都建出來，很痛苦。
+
+「插座供電」= 依賴注入。家電（類別）只需要「插上插座」——也就是在建構子宣告「我需要 `IUserRepository`」，至於電從哪來、是誰供的，交給電力公司（DI 容器）負責。
+
+DI 解決的問題就是：**把「建立依賴」的責任從類別自己身上拿走，交給外部容器**。於是換實作只要換插頭（改註冊那一行），類別本身一個字都不用改；測試時還能插「模擬電源」（假的實作）。這就是鬆耦合。
+
+**第 2 題：定義 `IGreeter` 與兩個實作、註冊並注入（動手題）**
+
+介面與兩個實作：
+
+```csharp
+public interface IGreeter
+{
+    string Greet(string name);
+}
+
+public class FriendlyGreeter : IGreeter
+{
+    public string Greet(string name) => $"嗨，{name}！很高興見到你 😊";
+}
+
+public class FormalGreeter : IGreeter
+{
+    public string Greet(string name) => $"您好，{name} 先生／女士。";
+}
+```
+
+在 `Program.cs` 註冊其中一個（`build()` 之前）：
+
+```csharp
+builder.Services.AddScoped<IGreeter, FriendlyGreeter>();
+```
+
+在 Controller 用建構子注入並使用：
+
+```csharp
+[ApiController]
+[Route("[controller]")]
+public class GreetController : ControllerBase
+{
+    private readonly IGreeter _greeter;
+
+    public GreetController(IGreeter greeter)   // DI 容器自動注入
+    {
+        _greeter = greeter;
+    }
+
+    [HttpGet("{name}")]
+    public string Get(string name) => _greeter.Greet(name);
+}
+```
+
+「只改註冊那行」換實作——把 `Program.cs` 那一行改成：
+
+```csharp
+builder.Services.AddScoped<IGreeter, FormalGreeter>();
+```
+
+驗收點：
+
+- 打 `GET /greet/小明`，第一種註冊回「嗨，小明！...」，改註冊後回「您好，小明 先生／女士。」。
+- 關鍵觀察：**`GreetController` 完全沒改一個字**，只換了註冊那一行，行為就變了——這就是鬆耦合的威力（呼應 [csharp-2-5] 依賴反轉原則 DIP）。
+
+> 這一步要實機跑起來、打端點觀察兩種回應，請自行驗證。
+
+**第 3 題：為什麼「依賴介面 + 從外注入」讓測試變容易？**
+
+因為測試時，你可以**注入一個「假的（fake / mock）實作」，取代真正的依賴**。
+
+拆開來看兩個關鍵：
+
+1. **依賴的是介面（`IUserRepository`）而非具體類別**：所以任何實作了這個介面的物件都能放進去——包括你為測試特製的假物件。
+2. **依賴從建構子外部注入，而不是類別自己 `new`**：所以測試程式可以「決定要給它什麼」，主控權在測試手上。
+
+於是測 `UserService` 時，不用真的連資料庫（那會慢、脆弱、還要準備測試資料庫），而是：
+
+```csharp
+var fakeRepo = new FakeUserRepository();       // 一個回傳固定假資料的實作
+var service = new UserService(fakeRepo);        // 直接注入假的
+var user = service.GetUser(1);
+// 就能純粹驗證 UserService 的邏輯，完全不碰真資料庫
+```
+
+這讓單元測試**快、可重複、能隔離**——只測「這個類別自己的邏輯」，不受外部依賴影響。這正是 DI（與其背後的 DIP）帶給測試的最大好處，[csharp-8-2] 會用 Moq 把這件事做得更漂亮。
+
+</details>
+
 ## 課外讀物
 
 > DI 的理論基礎——依賴反轉 → [csharp-2-5]、[課外讀物 E-7-6：依賴反轉原則](../../../課外讀物/E-7-solid/E-7-6-dip.md)

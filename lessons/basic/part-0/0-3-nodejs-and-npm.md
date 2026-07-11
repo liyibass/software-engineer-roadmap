@@ -226,6 +226,78 @@ npm start
 
 3. 把 `node_modules` 資料夾刪掉，然後執行 `npm install`，確認它能被完整重建
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：`npm init -y` 產生了什麼**
+
+```bash
+mkdir demo-project
+cd demo-project
+npm init -y
+```
+
+打開產生的 `package.json`，會看到 npm 幫你填好的一堆預設欄位，大致像這樣：
+
+```json
+{
+  "name": "demo-project",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+```
+
+`-y` 的意思就是「所有問題都用預設值，不要一個一個問我」。這裡最重要的是 `name`（專案名，預設用資料夾名）、`version`、`main`（進入點檔名）、`scripts`（自訂指令）。現在還沒有 `dependencies`，因為你還沒裝任何套件。
+
+**第 2 題：用 chalk 印出彩色文字**
+
+先講一個容易踩的坑：`chalk` 從第 5 版開始改成**純 ESM**，只能用 `import` 匯入，用課程目前教的 `require()` 會直接報錯。為了跟本章的 `require` 寫法一致，最單純的做法是指定安裝**還支援 `require` 的第 4 版**：
+
+```bash
+npm install chalk@4
+```
+
+建立 `index.js`：
+
+```javascript
+const chalk = require("chalk")
+
+console.log(chalk.red("這是紅色文字"))
+console.log(chalk.green("這是綠色文字"))
+console.log(chalk.blue("這是藍色文字"))
+```
+
+執行：
+
+```bash
+node index.js
+```
+
+你會在 Terminal 看到三行分別是紅、綠、藍的文字。`chalk.red(...)` 做的事，就是幫你的字串包上「顏色指令」，讓終端機用對應顏色顯示。
+
+> 小提醒：如果你不小心裝到 `chalk@5`（或不指定版本時裝到最新版），`require` 會報 `ERR_REQUIRE_ESM` 的錯。這時改用 `chalk@4`，或改成 ESM 的 `import chalk from "chalk"` 寫法即可。
+
+**第 3 題：刪掉 node_modules 再重建**
+
+```bash
+rm -rf node_modules
+npm install
+```
+
+（Windows PowerShell 可用 `Remove-Item -Recurse -Force node_modules`。）
+
+執行 `npm install` 之後，npm 會讀 `package.json`（搭配 `package-lock.json` 鎖定的精確版本），把所有套件重新下載回來，`node_modules` 又整個長回來，你的 `index.js` 照樣能跑。
+
+這個練習要體會的重點是：**`node_modules` 是「可以隨時丟掉、可以重建」的東西**。只要有 `package.json`，任何人跑一次 `npm install` 就能把環境還原。這正是為什麼把專案交給別人時，只傳程式碼和 `package.json`，不需要（也不應該）把幾百 MB 的 `node_modules` 一起傳。
+
+</details>
+
 ---
 
 ## 課外讀物

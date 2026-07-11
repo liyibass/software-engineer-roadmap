@@ -147,6 +147,17 @@ cat /etc/logrotate.d/nginx
 1. 你想看 Nginx 服務「有沒有正常啟動」，該用 `journalctl` 還是看 `/var/log`？
 2. 你想看「每一筆訪客請求」，又該看哪裡？
 
+<details>
+<summary>參考解答</summary>
+
+1. 用 **`journalctl`**。「服務有沒有正常啟動」屬於 systemd 管理服務的層級——啟動成功、失敗、卡在哪、噴什麼錯，全都被 journald 統一收走了。跑 `journalctl -u nginx` 就能看到 Nginx 這個 unit 的啟動過程。這是「systemd 服務先用 `journalctl` 查」這條大原則的直接應用。
+
+2. 看 **`/var/log/nginx/access.log`**。「每一筆訪客請求」是 Nginx 這個應用自己的細節記錄，它會把每個進來的請求寫成一行文字到 `access.log`。這類「特定應用的細節」journald 不會幫你整理，要直接去 `/var/log` 對應的檔案看。可以用 `sudo tail -f /var/log/nginx/access.log` 即時跟看。
+
+一句話總結：**服務層級的狀態（有沒有起來）看 journald，應用層級的細節（每筆請求）看 /var/log。**
+
+</details>
+
 ---
 
 ### 練習 2：實際查日誌
@@ -156,6 +167,19 @@ cat /etc/logrotate.d/nginx
 1. 用 `journalctl -u ssh --since today` 看今天的 SSH 服務日誌。
 2. 用 `sudo grep "Failed" /var/log/auth.log` 看看有沒有人嘗試亂登入你的機器（如果你的機器有公開 IP，通常會嚇到你——一堆機器人在敲門）。
 
+<details>
+<summary>參考解答</summary>
+
+這題要實機操作，最終結果請自行在你的伺服器上驗證。做法與驗收點：
+
+1. 執行 `journalctl -u ssh --since today`（有些系統的 unit 名叫 `sshd`，若查不到就改成 `journalctl -u sshd --since today`）。**驗收點**：能看到今天這個服務的日誌行，內容通常是登入接受（`Accepted`）、斷線（`Disconnected`）等記錄。如果今天沒任何 SSH 活動，可能是空的——可以拿掉 `--since today` 看歷史，或先自己 SSH 連一次再回來看。
+
+2. 執行 `sudo grep "Failed" /var/log/auth.log`。**驗收點**：如果機器有公開 IP，你八成會看到一大串 `Failed password for ... from <某個 IP>`——這些就是全世界的機器人在對你的 SSH 暴力猜密碼。看到的行數越多，代表被敲得越兇。若是純內網或剛開的機器，可能一筆都沒有，那也正常。
+
+補充：有些較新的系統改用 journald 而不寫 `auth.log`，那 `grep` 會說找不到檔案。這時改用 `sudo journalctl -u ssh | grep "Failed"` 也能達到同樣效果。這個「揪暴力破解」的線索，Part 8 加固時會正式用到。
+
+</details>
+
 ---
 
 ### 練習 3：理解日誌輪替的必要
@@ -164,3 +188,17 @@ cat /etc/logrotate.d/nginx
 
 1. 如果完全不做日誌輪替，一個高流量網站長期下來會發生什麼事？（提示：回想 Part 2-4 的 `df`）
 2. logrotate 的「切割、壓縮、刪除」三步驟，分別解決了什麼問題？
+
+<details>
+<summary>參考解答</summary>
+
+1. 日誌檔會**無限長大，最後把硬碟塞爆**。一個忙碌網站的 `access.log` 一天可能長好幾 GB，放著不管，`df -h` 上那顆磁碟的 `Use%` 會一路往上爬，直到 100%。硬碟一滿，後果是連鎖的：新的日誌寫不進去、資料庫寫不了、服務開始報錯甚至整個掛掉——這正是 Part 2-4 講的「硬碟空間用完」最典型的元兇。而且諷刺的是，把硬碟塞爆的常常就是「用來除錯的日誌」本身。
+
+2. 三步驟各自對應一個問題：
+   - **切割（rotate）**：把當前一直在長大的日誌檔封存起來（例如改名成 `access.log.1`），另開一個新檔繼續寫。解決「單一檔案無限膨脹、大到難以處理」的問題，也讓日誌以「一天一份」之類的單位分段，好查。
+   - **壓縮（compress）**：把封存的舊日誌壓成 `.gz`。文字日誌壓縮率很高，往往能省下 8~9 成空間。解決「保留歷史又不想佔太多磁碟」的矛盾。
+   - **刪除（保留策略）**：超過保留天數（如 `rotate 14` 只留 14 份）的自動清掉。解決「就算壓縮了，累積夠久還是會爆」的問題——用一個上限把總佔用空間框住。
+
+三步合起來，就達成「**保留一段夠用的歷史，又保證日誌永遠不會無限增長**」。
+
+</details>

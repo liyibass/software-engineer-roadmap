@@ -140,6 +140,21 @@ Helm 讓 K8s 的部署從「管理一堆零散 YAML」變成「管理打包好�
 
 用「apt / npm」的類比，解釋 Helm 對 K8s 的意義。它解決什麼痛點？
 
+<details>
+<summary>參考解答</summary>
+
+**類比**：Helm 是「**Kubernetes 的套件管理員**」——就像 `apt` 之於 Linux、`npm` 之於 Node。apt 讓你 `apt install nginx` 一行就裝好系統軟體，npm 讓你 `npm install` 拉好 JS 套件；Helm 讓你 `helm install` 一個指令就安裝、設定、管理一整套 K8s 應用。它的「套件」叫 **Chart**。
+
+**解決什麼痛點**：K8s 原始的部署方式，一個稍複雜的應用就要寫、管十幾個 YAML（Deployment、Service、Ingress、ConfigMap、Secret…）。痛點有三：
+
+- **檔案又多又雜、難管理**：一堆 YAML 散落各處。
+- **多環境重複設定**：開發 / 測試 / 正式設定大同小異，卻要各維護一套，容易「設定漂移」。
+- **裝別人的東西很麻煩**：想在 K8s 裝 Redis、Prometheus，要自己找齊、拼湊一堆 YAML。
+
+Helm 把「一堆繁瑣的 YAML」打包成「一個指令就能裝、可重用、可版本化」的 Chart，還能 `helm upgrade` 更新、`helm rollback` 一鍵回滾——就像 apt 之於 Linux，把繁瑣的安裝變簡單。
+
+</details>
+
 ---
 
 ### 練習 2：Chart 與 values
@@ -149,11 +164,38 @@ Helm 讓 K8s 的部署從「管理一堆零散 YAML」變成「管理打包好�
 1. Chart 和 values.yaml 各是什麼？
 2. 「同一個 Chart + 不同 values.yaml」怎麼解決「多環境重複設定」的問題？這呼應 infra Part 6 的什麼概念？
 
+<details>
+<summary>參考解答</summary>
+
+**1. Chart 和 values.yaml 各是什麼**：
+
+- **Chart**：一個「打包好的 K8s 應用**範本（模板）**」——把那十幾個 YAML 設定檔打包成一個可重用的單位，就是 Helm 的「套件」。社群有大量現成 Chart（像 Docker Hub 的 image），例如 `helm install my-redis bitnami/redis` 一行就把整套 Redis 裝進 K8s。
+- **values.yaml**：「**填進範本的參數（值）**」。Chart 是範本、留了很多可調的空格，values.yaml 就是填進去的具體值（要幾個 Pod、用哪個 image、要不要開 Ingress…）。
+
+**2. 怎麼解決多環境重複設定**：用「**同一個 Chart（一套範本）+ 不同的 values.yaml（不同的值）**」。開發環境用 `values-dev.yaml`（如 `replicas: 1`、CPU 小），正式環境用 `values-prod.yaml`（如 `replicas: 5`、CPU 大），但**結構共用同一個 Chart**。這樣就不用為每個環境各自複製、各自維護一整套 YAML（那正是設定漂移的溫床）——結構只有一份，環境差異只集中在小小的 values 檔裡。
+
+**呼應 infra Part 6 的什麼**：呼應 **infra Part 6-3 的 IaC（基礎設施即程式碼）——「可重現、消除設定漂移」** 的精神：一套範本、多環境重用，讓不同環境「設定不同但結構一致」，而不是各自手改、越飄越遠。
+
+</details>
+
 ---
 
 ### 練習 3：讀 values.yaml
 
 看上面那段 values.yaml，回答：這個部署要幾個 Pod？用哪個 image 的哪個版本？有沒有開 Ingress？
+
+<details>
+<summary>參考解答</summary>
+
+對照那段 values.yaml：
+
+- **要幾個 Pod**：**3 個**（`replicaCount: 3`，對應 7-7 的 Pod 副本數）。
+- **用哪個 image 的哪個版本**：image 的 repository 是 **`my-app`**、tag 是 **`v1.2`**（`image.repository: my-app`、`image.tag: "v1.2"`）——也就是 `my-app:v1.2`。
+- **有沒有開 Ingress**：**有開**（`ingress.enabled: true`），而且對外網域是 `myapp.com`（`ingress.host: myapp.com`）。
+
+重點體會：你不用去翻底層那一大堆 YAML，光看 values.yaml 這幾個好懂的參數，就能讀懂（也能調整）這個 Helm 部署的行為——這正是 values.yaml「用簡單參數控制整套複雜 K8s 設定」的價值。
+
+</details>
 
 ## 課外讀物
 

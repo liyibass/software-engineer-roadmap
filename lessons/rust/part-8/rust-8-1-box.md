@@ -106,6 +106,72 @@ fn print_list(list: &List) {
 2. 把本章的 `List` 例子打出來，建立一個 `5 -> 10 -> 15 -> Nil` 的串列並用 `print_list` 印出。
 3. 思考題：為什麼「直接內嵌的遞迴型別」大小是無限的，而「用 Box 內嵌指標」就變成固定大小？（提示：一個「記憶體位址」佔的空間是固定的嗎？）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：把 `String` 放到堆積上，印出它和長度**
+
+```rust
+fn main() {
+    let text = Box::new(String::from("哈囉，Rust"));
+    // Box 會自動解參考，所以 text 用起來幾乎跟 String 一樣：
+    println!("內容：{}", text);        // 哈囉，Rust
+    println!("長度：{}", text.len());  // len() 回傳的是「位元組數」，不是字元數
+}   // ← text 離開範圍，它擁有的堆積資料（含 String 內部的緩衝區）自動清理
+```
+
+說明：`Box<String>` 本身在堆疊上只是一個指標，指向堆積上的 `String`（而 `String` 內部又指向另一塊放實際文字的堆積）。這裡不用寫 `*text`，因為 Rust 的「自動解參考（Deref coercion）」會幫你把 `text.len()` 當成 `(*text).len()`。
+
+小提醒：`len()` 算的是 **UTF-8 位元組數**，中文一個字通常佔 3 個位元組，所以印出來的數字會比你看到的字數大——這是正常的，不是 bug。
+
+**第 2 題：建立 `5 -> 10 -> 15 -> Nil`**
+
+```rust
+enum List {
+    Node(i32, Box<List>),
+    Nil,
+}
+
+use List::{Node, Nil};
+
+fn main() {
+    let list = Node(5, Box::new(Node(10, Box::new(Node(15, Box::new(Nil))))));
+    print_list(&list);
+}
+
+fn print_list(list: &List) {
+    match list {
+        Node(value, next) => {
+            println!("{}", value);
+            print_list(next);      // next 的型別是 &Box<List>，會自動解參考成 &List
+        }
+        Nil => println!("(結束)"),
+    }
+}
+```
+
+執行輸出會是：
+```
+5
+10
+15
+(結束)
+```
+
+重點：建串列時是「由內往外包」——最裡面先寫 `Box::new(Nil)`，一層層往外包成 `Node`。`print_list` 收 `&List`（借用，不奪走所有權），這樣印完串列還在。
+
+**第 3 題（思考題）：為什麼直接內嵌是無限大、Box 就固定？**
+
+關鍵在編譯器「算型別大小」的方式。編譯器必須在編譯期就知道每個型別佔多少 bytes，才能決定怎麼在記憶體裡擺放它。
+
+- **直接內嵌 `Node(i32, List)`**：算一個 `Node` 的大小時，它包含「一個完整的 `List`」，而那個 `List` 又可能是 `Node`，裡面又包一個完整 `List`……這是一條永遠停不下來的展開，算出來是「無限大」，編譯器只好放棄（報 `recursive type has infinite size`）。
+
+- **用 Box `Node(i32, Box<List>)`**：`Box<List>` 存的不是「一整個 List」，而是「一個指向 List 的**記憶體位址**」。而記憶體位址的大小是**固定的**（在 64 位元機器上就是 8 bytes，不管它指向的東西多大）。所以一個 `Node` 的大小 = `i32`（4 bytes）+ 指標（8 bytes）= 固定值，編譯器算得出來。
+
+所以提示的答案是：**「記憶體位址」佔的空間是固定的**——不論它指向 1 bytes 還是 1 GB 的資料，位址本身都一樣大。Box 就是用「一個固定大小的指標」換掉「一個大小未知的內嵌值」，把無限遞迴斬斷在指標這一層。
+
+</details>
+
 ## 課外讀物
 
 > 鏈結串列、樹的概念與操作 → **dsa 課程 Part 2、Part 4**

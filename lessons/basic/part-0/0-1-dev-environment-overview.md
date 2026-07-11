@@ -131,6 +131,65 @@ Hello, World!
 2. 試著在第二行加上 `console.log("我開始學程式了")`，看看會發生什麼事
 3. 故意把 `console.log` 拼錯成 `consle.log`，看看錯誤訊息長什麼樣子——習慣看錯誤訊息很重要
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：改成你自己的名字**
+
+把 `hello.js` 改成（這裡以 Alice 為例）：
+
+```javascript
+console.log("Alice")
+```
+
+再執行一次：
+
+```bash
+node hello.js
+```
+
+會印出 `Alice`。`console.log()` 就是「把括號裡的東西印到畫面上」，換成什麼字串就印什麼。
+
+**第 2 題：加上第二行**
+
+```javascript
+console.log("Alice")
+console.log("我開始學程式了")
+```
+
+執行後會看到兩行：
+
+```
+Alice
+我開始學程式了
+```
+
+重點：程式是**由上往下一行一行執行**的，每呼叫一次 `console.log()` 就印出一行。所以你寫了兩行，就依序印出兩行。
+
+**第 3 題：故意拼錯**
+
+把 `console` 拼成 `consle`：
+
+```javascript
+consle.log("Alice")
+```
+
+執行會看到類似這樣的錯誤：
+
+```
+ReferenceError: consle is not defined
+```
+
+意思是「JavaScript 找不到一個叫 `consle` 的東西」——因為根本沒有這個名字。讀錯誤訊息的訣竅：
+
+1. **錯誤類型**：`ReferenceError`（引用了不存在的名字）。
+2. **說明**：`consle is not defined`（`consle` 沒有被定義）。
+3. **位置**：訊息通常還會附上檔名與行號，直接帶你去出錯的那一行。
+
+養成「看到錯誤先冷靜讀完訊息」的習慣，之後 debug 會快很多——錯誤訊息不是在罵你，是在告訴你哪裡出問題。
+
+</details>
+
 ---
 
 ## 接下來

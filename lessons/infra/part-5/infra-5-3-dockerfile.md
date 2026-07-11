@@ -184,6 +184,22 @@ CMD ["python", "app.py"]
 
 （提示：這是 Python 版的，邏輯和 Node 版一模一樣。）
 
+<details>
+<summary>參考解答</summary>
+
+逐行解釋：
+
+- `FROM python:3.12-alpine`：從官方的 Python 3.12 環境當**基底 image**開始（`alpine` 是超小的 Linux 版本，讓 image 更小）。相當於 Node 版的 `FROM node:20-alpine`。
+- `WORKDIR /app`：把容器內的**工作目錄**設成 `/app`，之後的 COPY、RUN、CMD 都在這裡執行。
+- `COPY requirements.txt ./`：先**只複製套件清單**（Python 的相依清單）到工作目錄。等同 Node 版先複製 `package*.json`。
+- `RUN pip install -r requirements.txt`：**build 時**執行，照 `requirements.txt` 把套件裝好。等同 Node 版的 `RUN npm install`。
+- `COPY . .`：把其餘所有程式碼複製進 image。
+- `CMD ["python", "app.py"]`：**容器啟動時**要跑的指令——用 python 執行 `app.py` 啟動你的程式。等同 Node 版的 `CMD ["node", "server.js"]`。
+
+整體邏輯：站在 Python 官方環境上 → 設工作目錄 → 先裝套件（利用快取，見練習 2）→ 放程式碼 → 啟動時跑 `app.py`。跟 Node 版一模一樣，只是把 npm 換成 pip。
+
+</details>
+
 ---
 
 ### 練習 2：理解分層快取
@@ -193,11 +209,79 @@ CMD ["python", "app.py"]
 1. `RUN` 和 `CMD` 的差別是什麼？
 2. 為什麼要「先 COPY package.json、裝套件，再 COPY 其餘程式碼」？如果反過來會怎樣？
 
+<details>
+<summary>參考解答</summary>
+
+1. **`RUN` 和 `CMD` 的差別在「什麼時候執行」**：
+   - `RUN` 是在**做 image 的時候（build 時）**執行，結果會被烤進 image 的某一層。像裝套件（`RUN npm install`）這種「做一次就好」的事，用 `RUN`。
+   - `CMD` 是在**容器跑起來時（run 時）**執行，每次啟動容器都會跑。像「啟動你的 server」（`CMD ["node", "server.js"]`）這種每次都要做的事，用 `CMD`。
+   - 一句話：`RUN` 是「備料（做 image 時炒好料）」，`CMD` 是「上菜（每次開店都要出的那道菜）」。
+
+2. **因為 Docker 的分層快取**。Dockerfile 每一行會建立一個「層」，Docker 會把每層快取起來；**只要某層和它之前的層都沒變，重新 build 時就直接用快取、跳過不重跑。** `npm install` 很慢，而「套件清單（package.json）」通常很少變、「程式碼」則常常改。所以把「先複製 package.json → 裝套件」放前面：只要套件清單沒變，這層永遠吃快取、瞬間跳過漫長的安裝，即使你改了程式碼也只會讓最後那層（COPY 程式碼）失效。
+
+   **如果反過來**（先 `COPY . .` 再 `npm install`）：因為程式碼幾乎每次都會變，`COPY . .` 那層一變，後面所有層（包含 `npm install`）的快取全部失效——於是**你每改一行程式碼，整個 `npm install` 就得重跑一次**，build 慢到崩潰。口訣：把「不常變、又很慢」的步驟放前面，「常變」的放後面。
+
+</details>
+
 ---
 
 ### 練習 3：打包你自己的程式
 
 把你 Part 4 的網站程式寫一個 Dockerfile，build 成 image 並跑起來，用 curl 確認能回應。然後改一行程式碼重新 build，觀察哪些層吃了快取（`CACHED`）。
+
+<details>
+<summary>參考解答</summary>
+
+這是動手／實機題，需要在你自己的伺服器上實作驗證。完整做法：
+
+**1. 準備 Dockerfile**（放在專案資料夾 `/home/deploy/myapp/`，內容照本章 Node 範例）：
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+CMD ["node", "server.js"]
+```
+
+順便建 `.dockerignore`（避免把 `node_modules` 塞進 image）：
+
+```
+node_modules
+.git
+```
+
+**2. build 成 image**（`.` 別忘了）：
+
+```bash
+cd /home/deploy/myapp
+docker build -t myapp:1.0 .
+```
+
+**3. 跑起來並驗證**：
+
+```bash
+docker run -d -p 3000:3000 --name myapp myapp:1.0
+curl http://localhost:3000
+```
+
+**4. 改一行程式碼再 build，觀察快取**：
+
+```bash
+# 隨便改一下 server.js 的回應文字，然後：
+docker build -t myapp:1.1 .
+```
+
+**驗收點**：
+
+- `docker build` 過程會一層一層跑，最後成功、`docker images` 看得到 `myapp` 的 `1.0`／`1.1`。
+- `curl http://localhost:3000` 要收到你 `server.js` 的回應。
+- 第二次 build 時，`FROM`、`COPY package*.json`、`RUN npm install` 這幾層應該顯示 **`CACHED`**（吃快取、瞬間跳過），只有 `COPY . .` 以及它之後的層會重跑——因為你只改了程式碼、沒動 `package.json`。這就親眼證實了「先 package.json 後程式碼」帶來的加速。
+
+> 這是實機操作，請以你自己伺服器上的實際輸出為準自行驗證。
+
+</details>
 
 > 提示：這個你親手做的 image，下一章會用 Docker Compose 把它和資料庫「組」在一起，變成完整一套環境。
 

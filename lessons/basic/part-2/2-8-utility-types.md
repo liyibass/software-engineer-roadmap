@@ -326,6 +326,70 @@ interface Product {
 
 試著用 `Pick`、`Partial`、`Readonly` 分別建立，然後寫個函式，參數或回傳值使用這些型別。
 
+<details>
+<summary>參考解答</summary>
+
+三個型別剛好對應三個 Utility Type，一個一個套上去就好，完全不用重寫 `Product` 的欄位：
+
+```typescript
+interface Product {
+  id: number
+  name: string
+  price: number
+  stock: number
+  description: string
+}
+
+// 只挑 name 和 price → 用 Pick
+type ProductPreview = Pick<Product, "name" | "price">
+
+// 所有欄位變可選 → 用 Partial
+type UpdateProduct = Partial<Product>
+
+// 所有欄位禁止修改 → 用 Readonly
+type ReadonlyProduct = Readonly<Product>
+```
+
+它們展開後分別長這樣，幫助你確認有沒有套對：
+
+```typescript
+// ProductPreview
+// { name: string; price: number }
+
+// UpdateProduct
+// { id?: number; name?: string; price?: number; stock?: number; description?: string }
+
+// ReadonlyProduct
+// { readonly id: number; readonly name: string; ... 每個都 readonly }
+```
+
+接著寫幾個函式實際用用看這些型別：
+
+```typescript
+// 列表頁只需要精簡版資料
+function renderProductCard(preview: ProductPreview): string {
+  return `${preview.name}：$${preview.price}`
+}
+
+// 更新 API：只送有改的欄位，所以參數用 Partial
+function updateProduct(id: number, changes: UpdateProduct): void {
+  console.log(`更新商品 ${id}:`, changes)
+}
+
+// 展示用途：拿到唯讀版，改不動
+function displayProduct(product: ReadonlyProduct): void {
+  console.log(product.name)
+  // product.price = 0  ← 這行會編譯錯誤，因為欄位是唯讀的
+}
+
+updateProduct(1, { price: 999 })          // 合法：只改價格
+updateProduct(1, { stock: 50, price: 888 })  // 合法：改多個欄位
+```
+
+重點是：`Product` 原始定義完全沒動，三個衍生型別都是從它「濾」出來的。以後 `Product` 加一個欄位，這三個型別會自動跟著更新，不用手動同步。
+
+</details>
+
 ---
 
 **練習 2 — 用 Record 建立對應表**
@@ -335,6 +399,57 @@ interface Product {
 請用 `Record` 建立一個型別 `WeekSchedule`，鍵是星期名稱（`"Monday" | "Tuesday" | ... | "Sunday"`），值是 `boolean`（代表是否為工作日）。
 
 然後建立一個符合這個型別的物件 `schedule`，並寫一個函式 `isWorkday(day: keyof WeekSchedule): boolean`。
+
+<details>
+<summary>參考解答</summary>
+
+`Record<K, V>` 的兩個位置分別是「key 的型別」和「value 的型別」。這題 key 是七個星期名稱組成的聯合型別，value 是 `boolean`：
+
+```typescript
+type Weekday = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
+
+type WeekSchedule = Record<Weekday, boolean>
+```
+
+`WeekSchedule` 展開後等同於自己手寫這一長串（`Record` 幫你省掉重複打字）：
+
+```typescript
+// type WeekSchedule = {
+//   Monday: boolean
+//   Tuesday: boolean
+//   ... 一路到 Sunday
+// }
+```
+
+接著建立符合型別的物件。這裡有個 `Record` 的好處：只要漏掉任何一天，TypeScript 就會報錯，逼你七天都填齊：
+
+```typescript
+const schedule: WeekSchedule = {
+  Monday: true,
+  Tuesday: true,
+  Wednesday: true,
+  Thursday: true,
+  Friday: true,
+  Saturday: false,
+  Sunday: false,
+}
+```
+
+最後的函式用 `keyof WeekSchedule` 當參數型別，意思是「只接受 `WeekSchedule` 的 key」，也就是那七個星期名稱，傳其他字串會被擋下來：
+
+```typescript
+function isWorkday(day: keyof WeekSchedule): boolean {
+  return schedule[day]
+}
+
+console.log(isWorkday("Monday"))    // true
+console.log(isWorkday("Sunday"))    // false
+// isWorkday("Funday")  ← 編譯錯誤，因為 "Funday" 不是合法的 key
+```
+
+`keyof WeekSchedule` 其實就等於前面那個 `Weekday` 聯合型別，用 `keyof` 從型別直接取 key，就不用再多定義一次。
+
+</details>
 
 ---
 
@@ -356,3 +471,50 @@ function fetchUserProfile() {
 1. 用 `ReturnType` 建立 `UserProfile` 型別
 2. 寫一個函式 `renderProfile(profile: UserProfile): string`，回傳格式化的介紹字串
 3. 思考：如果之後 `fetchUserProfile` 新增了一個 `isPremium: boolean` 欄位，`UserProfile` 和 `renderProfile` 需要手動更新嗎？
+
+<details>
+<summary>參考解答</summary>
+
+第 1 步，用 `ReturnType` 從函式反推回傳型別。記得語法要先用 `typeof` 把「函式這個值」轉成型別，再丟給 `ReturnType`：
+
+```typescript
+function fetchUserProfile() {
+  return {
+    displayName: "Alice Chen",
+    avatarUrl: "https://example.com/avatar.jpg",
+    joinedAt: new Date("2024-01-01"),
+    followerCount: 128,
+  }
+}
+
+type UserProfile = ReturnType<typeof fetchUserProfile>
+// 自動推斷成：
+// {
+//   displayName: string
+//   avatarUrl: string
+//   joinedAt: Date
+//   followerCount: number
+// }
+```
+
+第 2 步，寫 `renderProfile`。`joinedAt` 是 `Date` 物件，可以直接呼叫它的方法來格式化：
+
+```typescript
+function renderProfile(profile: UserProfile): string {
+  const joinedDate = profile.joinedAt.toLocaleDateString()
+  return `${profile.displayName}（加入於 ${joinedDate}，${profile.followerCount} 位追蹤者）`
+}
+
+const profile = fetchUserProfile()
+console.log(renderProfile(profile))
+// Alice Chen（加入於 2024/1/1，128 位追蹤者）
+```
+
+第 3 步，思考題的答案：**`UserProfile` 不用手動更新，`renderProfile` 則看情況。**
+
+- `UserProfile` 是用 `ReturnType<typeof fetchUserProfile>` 推出來的，函式回傳值一加 `isPremium`，這個型別會**自動**跟著多出 `isPremium: boolean`。這正是 `ReturnType` 最大的好處——型別永遠跟著函式走，不會忘記同步。
+- `renderProfile` 要不要改，取決於你「想不想用」這個新欄位。它現在能不能通過編譯？可以，因為它只用了本來就有的欄位。但如果你希望介紹字串裡顯示「是否為付費會員」，那就得自己動手在函式裡加上對 `profile.isPremium` 的處理。
+
+一句話總結：型別的同步 `ReturnType` 幫你顧好了，但「要不要用新資料」是商業邏輯，還是得由你決定。
+
+</details>

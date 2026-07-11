@@ -83,6 +83,62 @@ age = "thirty";        // ❌ 編譯錯誤！不能把字串塞進 int
 2. 對照表裡挑三個概念，各寫出 TypeScript 和 C# 的寫法，比較差異。
 3. 故意寫 `int x = "hello";`，`dotnet build`，讀讀強型別擋下你的錯誤訊息。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：把頂層語句版改寫成傳統 class + Main**
+
+頂層語句版通常只有一行 `Console.WriteLine("Hello, C#!");`。改寫成傳統完整版就是把那行「包」進 `namespace → class → Main` 三層裡：
+
+```csharp
+using System;
+
+namespace HelloApp
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Hello, C#!");
+        }
+    }
+}
+```
+
+做法：把上面存成 `Program.cs`，在專案資料夾 `dotnet run`。你會看到印出 `Hello, C#!`，跟精簡版一模一樣——因為精簡版只是「編譯器自動幫你補上 class/Main 的樣板」，本質相同。
+
+> 動手題，請自行實機驗證。驗收點：`dotnet run` 輸出 `Hello, C#!`，且沒有編譯錯誤。
+
+**練習 2：挑三個概念比較 TS 與 C#**
+
+以「宣告變數（明確型別）」「印出」「函式/方法」三個為例：
+
+| 概念 | TypeScript | C# | 差異重點 |
+|------|-----------|-----|---------|
+| 宣告變數 | `let name: string = "Amy";` | `string name = "Amy";` | 型別位置：TS 在變數名「後面」用冒號，C# 在「前面」 |
+| 印出 | `console.log(x);` | `Console.WriteLine(x);` | C# 用 `Console.WriteLine`（大寫、來自 System 命名空間） |
+| 函式/方法 | `function add(a: number, b: number): number { return a + b; }` | `int Add(int a, int b) { return a + b; }` | 回傳型別：TS 寫在參數列後面，C# 寫在方法名最前面；C# 方法名慣例用 PascalCase |
+
+一句話總結：兩者「都要講清楚型別」，精神一致，差別主要在「型別寫的位置」和「命名慣例」。
+
+**練習 3：故意寫型別錯誤，讀編譯錯誤訊息**
+
+```csharp
+int x = "hello";   // ❌ 想把字串塞進 int
+```
+
+`dotnet build` 會失敗，錯誤訊息類似：
+
+```
+error CS0029: Cannot implicitly convert type 'string' to 'int'
+```
+
+`CS0029` 是 C# 編譯器的錯誤代碼，意思是「無法把 string 隱式轉成 int」。重點是：這個錯誤出現在**編譯階段**（build 時），程式根本沒開始跑就被擋下來了——這正是強型別的價值，很多 bug 在你按下執行之前就被抓出來。
+
+> 動手題，請自行實機驗證。驗收點：`dotnet build` 回報 CS0029（或類似「無法轉換型別」）錯誤、build 失敗。
+
+</details>
+
 ## 課外讀物
 
 > 強型別的好處（TS 對照）→ [課外讀物 E-6-4：TypeScript 最佳實踐](../../../課外讀物/E-6-best-practices/E-6-4-typescript-best-practices.md)

@@ -127,6 +127,29 @@ sudo apt upgrade
 
 觀察 `apt update` 列出有多少套件「可以升級」，再決定要不要 `upgrade`。
 
+<details>
+<summary>參考解答</summary>
+
+**需自行在你的伺服器上實際跑**，這裡說明你會看到什麼、驗收點在哪：
+
+```bash
+sudo apt update
+```
+
+跑完最後一行通常會告訴你有幾個套件可升級，例如 `N packages can be upgraded. Run 'apt list --upgradable' to see them.`——**這個 N 就是「可升級的套件數量」**。想看是哪些，可跑 `apt list --upgradable`。
+
+```bash
+sudo apt upgrade
+```
+
+它會列出打算升級的套件清單、要下載多大，然後問你 `Y/n` 確認，按 `y` 加 Enter 就開始。
+
+**驗收點**：升級完再跑一次 `sudo apt update`，這次結尾應該變成 `All packages are up to date.`（沒有可升級的了）。
+
+**小提醒**：一台剛開的機器第一次 upgrade 可能要更新不少套件、花點時間，這是正常的；平常養成「先 update 再 upgrade」的維護習慣即可。
+
+</details>
+
 ---
 
 ### 練習 2：安裝一個好用工具
@@ -140,6 +163,31 @@ htop
 
 感受一下它比 `top` 好讀在哪。看完按 `q` 離開。
 
+<details>
+<summary>參考解答</summary>
+
+**需自行在你的伺服器上實際跑**，流程與觀察重點：
+
+```bash
+sudo apt install htop
+```
+
+裝的時候會問 `Y/n`，按 `y` 確認。裝好後：
+
+```bash
+htop
+```
+
+**驗收點／觀察重點**（對照上一章 2-3 的 `top`）：
+
+- **有顏色、更好讀**：CPU、記憶體用量用彩色長條顯示，一眼看出忙不忙。
+- **上方每顆 CPU 核心一條**：能直接看到各核心的負載，比 `top` 直覺。
+- **能用方向鍵選行程**：上下鍵移動選取某個行程，按 `F9` 可以直接送出 kill 訊號結束它（不用像 `top` 那樣手動記 PID 再 `kill`）。
+
+看完按 `q` 離開。如果 `apt install htop` 之前沒先 `sudo apt update` 過、出現「找不到套件」的錯誤，先跑一次 `sudo apt update` 更新清單再裝（這正好呼應下一題）。
+
+</details>
+
 ---
 
 ### 練習 3：理解 update 與 upgrade 的差別
@@ -150,6 +198,19 @@ htop
 2. 如果跳過 `apt update` 直接 `apt upgrade`，可能會發生什麼問題？
 
 > 提示：想想「目錄清單」如果是舊的，會怎麼影響升級。
+
+<details>
+<summary>參考解答</summary>
+
+1. **`apt update` 更新了什麼？** 它更新的是**「軟體清單／目錄」**，不是軟體本身。它跑去問每個官方軟體庫：「你們現在有哪些套件、各自最新是什麼版本？」，然後把這份最新目錄記在本機。可以想成**去書店拿一份最新的書目**——你手上有了最新目錄，但還沒買任何書。
+
+2. **跳過 `apt update` 直接 `apt upgrade` 會怎樣？** `upgrade` 是「照著本機的清單，把軟體升到清單上寫的版本」。如果清單是**舊的**，會有兩個問題：
+   - **升不到真正的最新版**：清單上記的還是舊版本號，`upgrade` 以為「已經是最新」而不動作，你就錯過了實際已釋出的更新（包含重要的安全修補）。
+   - **裝新軟體時可能失敗**：`apt install 某套件` 也是照清單去找下載位置，清單過舊時可能指向已經不存在的舊版檔案，導致「找不到套件」或下載失敗。
+
+**結論**：所以標準習慣是**先 `apt update`（拿最新目錄）再 `apt upgrade` 或 `install`**，確保你根據的是最新資訊。
+
+</details>
 
 ## 課外讀物
 

@@ -107,6 +107,69 @@ export Jwt__Key="正式的JWT金鑰"
 2. 檢查你的 `.gitignore`，確認任何含機密的檔案都被排除。
 3. 思考題：如果不小心把資料庫密碼 commit 進公開 GitHub 又 push 了，正確的處理是什麼？（提示：不只是刪掉。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（動手題）：用 User Secrets 把機密移出 appsettings.json。**
+
+先啟用，再把機密設進去，最後把 appsettings.json 裡的密碼／金鑰刪掉：
+
+```bash
+# 1. 一次性啟用（會在 .csproj 產生 UserSecretsId）
+dotnet user-secrets init
+
+# 2. 把機密設進本機的 secrets store（不在專案資料夾、不進 Git）
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=todo;Username=app;Password=真密碼"
+dotnet user-secrets set "Jwt:Key" "你的JWT簽章金鑰至少32字元夠長夠隨機"
+
+# 3. 確認有設進去
+dotnet user-secrets list
+```
+
+程式碼**完全不用改**，照樣從 Configuration 讀——設定系統在開發環境會自動把 User Secrets 併進來：
+
+```csharp
+var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
+var jwtKey  = builder.Configuration["Jwt:Key"];
+```
+
+**驗收點**：把 appsettings.json 裡的密碼欄位清空（或整個移除）後，`dotnet run` 仍然連得上資料庫、JWT 仍簽得出來——證明值是從 User Secrets 讀到的。需自行實機驗證。
+
+**第 2 題（動手題）：檢查 `.gitignore`。**
+
+確認任何「可能含機密」的檔案都被排除。dotnet 的 User Secrets 本來就存在專案外（使用者目錄下），所以不需列進 `.gitignore`；要小心的是專案內可能放機密的檔案：
+
+```gitignore
+# 環境變數檔
+*.env
+.env.*
+
+# 若 Development 設定檔曾放過機密（視情況）
+appsettings.Development.json
+
+# 其他常見機密檔
+*.pfx
+*.key
+secrets.json
+```
+
+**驗收點**：`git status` 看不到含機密的檔案被列為待追蹤；用 `git check-ignore -v appsettings.Development.json`（若你想排除它）確認它確實被某條規則命中。commit 前養成「掃一眼有沒有機密混進 staged 檔案」的習慣。
+
+**第 3 題（思考題）：密碼已經 push 進公開 GitHub 了，怎麼辦？**
+
+關鍵觀念：**一旦機密進過 Git，就必須視為「已經外洩」**——因為公開 repo 上的金鑰，幾分鐘內就會被自動掃描的機器人撿走。所以「刪掉那行再 commit」是**遠遠不夠**的，那行仍留在 Git 歷史裡任何人都翻得到。
+
+正確處理的優先順序：
+
+1. **立刻作廢並輪替（rotate）那個金鑰**——這是最重要、最優先的一步。改資料庫密碼、重新產生新的 JWICE 金鑰／API key，讓「外洩的那把」立即失效。就算它被撿走也已經沒用了。
+2. **從 Git 歷史徹底清除**——用 `git filter-repo`（或 BFG Repo-Cleaner）把該檔案／該值從所有歷史 commit 移除，然後 force push。注意這會改寫歷史，需通知協作者重新 clone。
+3. **檢查有沒有被濫用**——看資料庫／雲端帳號的存取記錄、帳單，確認在作廢前沒被人趁隙使用。
+4. **之後改用正確做法**——把機密移到 User Secrets／環境變數／密鑰管理服務，並確認 `.gitignore` 到位，避免再犯。
+
+一句話總結：**先當它已經外洩、立刻換掉那把金鑰**（第 1 步止血最關鍵），再清歷史。只刪不換 = 沒處理。
+
+</details>
+
 ## 課外讀物
 
 > 機密管理、別進 Git、Web 安全 → [課外讀物 E-10：Web Security](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)、[課外讀物 E-8：Git](../../../課外讀物/E-8-git/E-8-1-git-internals.md)

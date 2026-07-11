@@ -121,17 +121,70 @@ Alarms（用 SRE Part 4 的智慧設計）：
 
 回答：CloudWatch 提供哪三大功能？它相當於你 infra Part 7 自己架的什麼組合？
 
+<details>
+<summary>參考解答</summary>
+
+CloudWatch 的三大功能：
+
+1. **Logs（日誌）**：集中收集各服務的日誌（Lambda 輸出、ECS 容器日誌、EC2 裝 agent 送來的日誌…），還能用 Logs Insights 做查詢分析。對應 infra Part 7-1 的日誌、SRE 三支柱的 Logs。
+2. **Metrics（指標）**：AWS 服務自動把指標送進來（EC2 CPU、RDS 連線數、ALB 請求數…），不用你自己裝收集器。對應 infra Part 7-2 的指標、SRE 的黃金訊號/Prometheus。
+3. **Alarms（告警）**：對指標設條件，達到就通知或觸發自動動作。對應 SRE Part 4 的告警。
+
+（再加上 Dashboards 儀表板，對應 infra Part 7-4 / SRE Part 3-4。）
+
+它相當於什麼組合？CloudWatch ≈ **AWS 受管版的「Prometheus + Grafana + Alertmanager」**——也就是你在 infra Part 7 自己一台台架起來的那整套觀測系統。差別在於 AWS 幫你顧好維運、且和 AWS 服務深度整合，代價是綁 AWS、按用量計費。
+
+</details>
+
 ---
 
 ### 練習 2：設計告警
 
 用 SRE Part 4 的智慧，為一個 web 服務設計 2~3 個 CloudWatch 告警。記得：對症狀、別擾民、只在需要行動時通知。
 
+<details>
+<summary>參考解答</summary>
+
+示範答案（一個跑在 ALB + ECS + RDS 上的 web 服務）：
+
+1. **[通知] ALB 5xx 錯誤率 > 1% 持續 5 分鐘** — 對「症狀」告警（使用者真的看到錯誤），而不是對某台機器的內部狀態告警。持續 5 分鐘可濾掉瞬間抖動，避免告警疲勞（SRE 4-2）。
+2. **[通知] ALB p99 回應時間 > 1 秒 持續 5 分鐘** — 延遲是使用者實際體感的症狀（SRE 4-4 對症狀告警）。
+3. **[通知] RDS 可用儲存空間 < 10%** — 容量趨勢型的預警，這是「真的需要人去處理」（擴容/清資料）才通知，符合 SRE 4-1「只在需要行動時才通知」。
+
+設計要點回顧：
+- **對症狀，不對原因**：告「使用者遇到錯誤/變慢」，而不是告「某台 CPU 一時飆高」。
+- **設持續時間**：`持續 N 分鐘` 過濾瞬間尖峰，減少誤報。
+- **區分「通知人」與「自動動作」**：像「ECS CPU > 70% → 觸發 Auto Scaling」這種可以自動處理的，設成自動動作而非吵醒人（aws-3-4）。
+- **避免的反例**：對 CPU 瞬間尖峰、對每個微小指標都告警 → 告警疲勞，久了大家就無視告警。
+
+> 這題沒有唯一解，重點是有沒有用上「對症狀、別擾民、只在需行動時通知」這三個原則。
+
+</details>
+
 ---
 
 ### 練習 3：對照與選擇
 
 回答：CloudWatch 和自架 Prometheus/Grafana 各有什麼優劣？什麼情況用哪個？
+
+<details>
+<summary>參考解答</summary>
+
+| 面向 | CloudWatch | 自架 Prometheus/Grafana |
+|---|---|---|
+| **維運** | AWS 全託管，省心 | 要自己架、自己顧（升級、擴容、備份都你來）|
+| **AWS 整合** | 深度整合，指標自動就有 | 要自己接 exporter/整合 |
+| **可移植性** | 綁 AWS，換雲要重做 | 通用、跨雲可移植，Prometheus 生態豐富 |
+| **成本** | 按用量計費（日誌量大、自訂指標多會變貴）| 自己的機器成本，但要投入人力維運 |
+
+**什麼情況用哪個：**
+- **純用 AWS、想省心** → 用 CloudWatch，開箱即用、免維運。
+- **要跨雲/避免綁定、要 Prometheus 生態（PromQL、豐富的社群 exporter/dashboard）** → 自架（或用 AWS 的 Managed Prometheus/Grafana，折衷方案）。
+- **很多團隊兩者並用**：CloudWatch 看 AWS 服務層的指標，Prometheus 看應用層的自訂指標。
+
+核心心法：這又是一次「**取捨**」（呼應 aws-6-1 受管 vs 自架）——沒有絕對的好壞，看你重視省心還是可移植、看你的規模與團隊能力。
+
+</details>
 
 ## 課外讀物
 

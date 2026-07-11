@@ -117,6 +117,81 @@ function hasDuplicates_fast(arr: number[]): boolean {
 2. 用 `Set` 一行去除一個陣列裡的重複元素。
 3. 把一個「用陣列 + includes 判斷重複」的 O(n²) 函式，改成「用 Set」的 O(n) 版本，說明為什麼變快。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用 `Map` 統計每個字出現幾次**
+
+思路：把每個字當 key、目前的次數當 value。走訪字串時，看這個字在不在 Map 裡——在就把次數 +1，不在就從 1 開始。`get`/`set`/`has` 都是平均 O(1)，所以整體 O(n)（n 是字串長度）。
+
+```typescript
+function countChars(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const char of text) {
+    // 取現有次數，沒有就當 0，再 +1
+    counts.set(char, (counts.get(char) ?? 0) + 1);
+  }
+  return counts;
+}
+
+const result = countChars("banana");
+console.log(result.get("a")); // 3
+console.log(result.get("n")); // 2
+console.log(result.get("b")); // 1
+```
+
+小技巧：`counts.get(char) ?? 0` 用 `??`（nullish coalescing）處理「第一次看到、還沒有值」的情況——`get` 回傳 `undefined` 時就當作 0。
+
+**第 2 題：用 `Set` 一行去重**
+
+`Set` 本身就不存重複元素，把陣列丟進 `new Set(...)` 就自動去重，再用展開語法 `[...]` 攤回陣列：
+
+```typescript
+const numbers = [1, 2, 2, 3, 3, 3, 4];
+const unique = [...new Set(numbers)]; // [1, 2, 3, 4]
+```
+
+這是 TypeScript / JavaScript 去重的經典慣用法。
+
+**第 3 題：把 O(n²) 改成 O(n)，並說明為什麼變快**
+
+原本用陣列 + `includes` 判斷重複：
+
+```typescript
+// ❌ 慢：O(n²)
+function hasDuplicates_slow(arr: number[]): boolean {
+  const seen: number[] = [];
+  for (const x of arr) {
+    if (seen.includes(x)) return true; // includes 是 O(n)
+    seen.push(x);
+  }
+  return false;
+}
+```
+
+改用 `Set`：
+
+```typescript
+// ✅ 快：O(n)
+function hasDuplicates(arr: number[]): boolean {
+  const seen = new Set<number>();
+  for (const x of arr) {
+    if (seen.has(x)) return true; // has 是平均 O(1)
+    seen.add(x);
+  }
+  return false;
+}
+```
+
+**為什麼變快**：兩個版本的邏輯完全一樣——都是「一邊走訪、一邊記住看過的，遇到看過的就代表有重複」。差別只在「判斷看過沒」這一步：
+
+- 陣列的 `includes` 要從頭逐一比對，是 **O(n)**。它被放在迴圈裡（也是 n 次），所以整體 O(n) × n = **O(n²)**。
+- `Set` 的 `has` 靠雜湊直接算位址，是**平均 O(1)**。放在迴圈裡就是 O(1) × n = **O(n)**。
+
+也就是說，我們用「多開一個 Set 的空間」換到「查找從 O(n) 降到 O(1)」——這是**用空間換時間**的典型，也是「看到迴圈裡的 `arr.includes` / `arr.find` 就想換成 Set / Map」這個高頻優化訊號的實際應用。
+
+</details>
+
 ## 課外讀物
 
 > 雜湊表原理 → 複習 [dsa-3-1]、[dsa-3-2]；用空間換時間 → [dsa-1-3]

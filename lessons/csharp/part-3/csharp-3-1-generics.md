@@ -102,6 +102,68 @@ Console.WriteLine(Max(new List<string> { "a", "z" }));  // z
 2. 寫一個泛型類別 `Pair<T>`，有兩個同型別的屬性 `First`、`Second`，建立 int 版和 string 版。
 3. 思考題：為什麼泛型比「用 `object` 裝所有東西、再轉型」更好？（提示：型別安全、不用轉型、編譯期就抓錯。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：泛型方法 `Last<T>`**
+
+和 `First<T>` 一樣是「型別待定」的模板，只是回傳 `list[list.Count - 1]`（清單最後一個索引）。呼叫時編譯器一樣會自動推斷 `T`：
+
+```csharp
+T Last<T>(List<T> list)
+{
+    return list[list.Count - 1];   // Count - 1 是最後一個元素的索引
+}
+
+List<int> numbers = new List<int> { 10, 20, 30 };
+Console.WriteLine(Last(numbers));       // T 推斷成 int → 30
+
+List<string> names = new List<string> { "Amy", "Bob" };
+Console.WriteLine(Last(names));         // T 推斷成 string → "Bob"
+```
+
+驗收點：`int` 版印出 `30`、`string` 版印出 `Bob`，且回傳值就是原本的型別（不用再轉型）。
+
+**第 2 題：泛型類別 `Pair<T>`**
+
+兩個屬性都是同一個型別參數 `T`，所以「int 版」的 `First`、`Second` 都是 int，「string 版」的都是 string：
+
+```csharp
+class Pair<T>
+{
+    public T First { get; set; }
+    public T Second { get; set; }
+
+    public Pair(T first, T second)
+    {
+        First = first;
+        Second = second;
+    }
+}
+
+var intPair = new Pair<int>(1, 2);
+Console.WriteLine($"{intPair.First}, {intPair.Second}");        // 1, 2
+
+var strPair = new Pair<string>("hello", "world");
+Console.WriteLine($"{strPair.First}, {strPair.Second}");        // hello, world
+```
+
+驗收點：兩種型別都能建立，屬性型別各自對應（`intPair.First` 是 int、`strPair.First` 是 string），編譯器全程知道型別。
+
+**第 3 題（思考題）：泛型 vs `object` + 轉型**
+
+用 `object` 裝所有東西看起來也能「通用」，但有三個大問題，泛型全部解決：
+
+1. **型別安全**：`object` 版本什麼都吃得下，你可以不小心把一個 `string` 塞進「本來想放 int」的清單，編譯器不會擋，等到執行期才爆炸。泛型的 `List<int>` 只收 int，放錯東西**編譯期就報錯**。
+2. **不用轉型**：從 `object` 拿東西出來，型別是 `object`，你得手動 `(int)` 轉回來——囉嗦又容易轉錯（轉錯會丟 `InvalidCastException`）。泛型拿出來就是 `int`，直接用。
+3. **效能**：把 `int`（實值型別）裝進 `object` 會發生**裝箱（boxing）**，多一層包裝與記憶體配置；泛型沒有這個成本。
+
+一句話總結：泛型讓編譯器「全程知道真正的型別」，所以能在**編譯期**幫你抓錯、省去轉型、避免裝箱；`object` 則是把型別資訊丟掉、把風險延後到執行期。
+
+> 這正是「不要重複自己（DRY）」＋「型別安全」的體現 → [課外讀物 E-6-1](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)
+
+</details>
+
 ## 課外讀物
 
 > 泛型概念（trait bound 對照）→ **rust 課程 [rust-5-1]**；不要重複自己（DRY）→ [課外讀物 E-6-1](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)

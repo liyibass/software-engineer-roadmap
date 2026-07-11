@@ -120,6 +120,77 @@ fn main() {
 2. 用 `entry().or_insert()` 統計一句話裡每個字母（或每個詞）出現幾次。
 3. 走訪你的 HashMap 印出所有鍵值對，連續執行幾次，觀察順序是否每次相同（體會「不保證順序」）。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**：`HashMap` 要先 `use` 引入。`get` 回傳 `Option`，所以「存在」與「不存在」分別對應 `Some` 和 `None`，用 `match` 處理最自然。
+
+```rust
+use std::collections::HashMap;
+
+fn main() {
+    let mut capitals = HashMap::new();
+    capitals.insert("台灣", "台北");
+    capitals.insert("日本", "東京");
+    capitals.insert("法國", "巴黎");
+
+    // 存在的
+    match capitals.get("日本") {
+        Some(city) => println!("日本的首都是 {}", city), // 走這裡
+        None => println!("查無此國"),
+    }
+
+    // 不存在的
+    match capitals.get("火星") {
+        Some(city) => println!("火星的首都是 {}", city),
+        None => println!("查無此國：火星"), // 走這裡
+    }
+}
+```
+
+小提醒：`get` 回傳的是 `Option<&V>`（值的**參考**），因為 HashMap 還擁有那個值，只是借你看一眼。
+
+**練習 2**：這就是本章「計數」的經典模式——`entry(key).or_insert(0)` 回傳「該鍵對應值的可變參考」，再 `*counter += 1` 透過它累加。
+
+```rust
+use std::collections::HashMap;
+
+fn main() {
+    let text = "蘋果 香蕉 蘋果 橘子 蘋果 香蕉";
+    let mut counts = HashMap::new();
+
+    for word in text.split_whitespace() { // 依空白切成一個個詞
+        let counter = counts.entry(word).or_insert(0); // 沒有就設 0
+        *counter += 1;                                  // 透過參考 +1
+    }
+
+    println!("{:?}", counts); // {"蘋果": 3, "香蕉": 2, "橘子": 1}（順序不定）
+}
+```
+
+驗收點：每個詞的次數要對（蘋果 3、香蕉 2、橘子 1）。若想數「字母」而非「詞」，把迴圈改成 `for ch in text.chars()`、鍵型別會變成 `char`，其餘一樣。
+
+**練習 3**：用 `for (k, v) in &map` 借用走訪。重點是「觀察」——`HashMap` 為了查找快而犧牲順序，所以印出來的次序不保證跟插入順序一致，甚至每次執行都可能不同。
+
+```rust
+use std::collections::HashMap;
+
+fn main() {
+    let mut stock = HashMap::new();
+    stock.insert("蘋果", 50);
+    stock.insert("香蕉", 30);
+    stock.insert("橘子", 20);
+
+    for (name, qty) in &stock {
+        println!("{}: {}", name, qty);
+    }
+}
+```
+
+需自行實機驗證：把這支程式連續 `cargo run` 幾次，觀察三行印出的先後順序有沒有變。這正是「不保證順序」的體感——如果你需要「照鍵排序」的穩定順序，就改用 `BTreeMap`。
+
+</details>
+
 ## 課外讀物
 
 > `HashMap` 為什麼能 O(1) 查找、雜湊碰撞怎麼解 → **dsa 課程 Part 3：雜湊表、雜湊碰撞**

@@ -300,6 +300,35 @@ sequenceDiagram
 4. 用 `git add` 和 `git commit` 建立第一個 commit
 5. 執行 `git log` 確認 commit 成功
 
+<details>
+<summary>參考解答</summary>
+
+完整指令流程如下（`~/Desktop` 是桌面路徑）：
+
+```bash
+mkdir ~/Desktop/git-practice
+cd ~/Desktop/git-practice
+git init
+
+# 建立一個簡單的 HTML 頁面
+echo "<!DOCTYPE html><html><body><h1>我的第一個網頁</h1></body></html>" > index.html
+
+git add index.html
+git commit -m "新增首頁 HTML 結構"
+git log
+```
+
+每一步在做什麼：
+
+1. `git init`：把這個資料夾變成 Git 專案，會產生隱藏的 `.git` 資料夾。
+2. 建立 `index.html`：這時它是「untracked（未追蹤）」狀態，可先用 `git status` 確認。
+3. `git add index.html`：把檔案放進暫存區（打包箱）。
+4. `git commit -m "..."`：把暫存區的內容打包成一個快照存進倉庫。
+
+**驗收檢查點**：`git log` 應該顯示你剛建立的那一個 commit，包含它的 ID、作者、時間與訊息「新增首頁 HTML 結構」。**最終仍需自行在終端機實際執行驗證。**
+
+</details>
+
 ### 練習二：做三個有意義的 commit
 
 繼續在同一個資料夾：
@@ -308,11 +337,76 @@ sequenceDiagram
 2. 修改 `index.html`，把 CSS 連進去，建立第三個 commit（訊息：「連結 CSS 到首頁」）
 3. 執行 `git log --oneline` 看看你的三個 commit
 
+<details>
+<summary>參考解答</summary>
+
+接續練習一的資料夾繼續做：
+
+```bash
+# 第二個 commit：新增 CSS
+echo "body { font-family: sans-serif; }" > style.css
+git add style.css
+git commit -m "新增 CSS 樣式"
+
+# 第三個 commit：把 CSS 連進 index.html
+echo "<!DOCTYPE html><html><head><link rel='stylesheet' href='style.css'></head><body><h1>我的第一個網頁</h1></body></html>" > index.html
+git add index.html
+git commit -m "連結 CSS 到首頁"
+
+git log --oneline
+```
+
+`git log --oneline` 會用「一行一個 commit」的精簡格式顯示，由新到舊排列，類似：
+
+```
+e5c1a90 (HEAD -> main) 連結 CSS 到首頁
+b7a4c89 新增 CSS 樣式
+a3f8c12 新增首頁 HTML 結構
+```
+
+（前面那串英數字是每個 commit 的 ID，你看到的會跟這裡不一樣，這是正常的。）
+
+重點：每個 commit 只做「一件有意義的事」，訊息就能完整說清楚這次改了什麼——三個月後回來看歷史，一眼就懂。**最終仍需自行實際執行驗證。**
+
+</details>
+
 ### 練習三：用 git diff 看改動
 
 1. 修改 `index.html`，加一些內容
 2. **先不要 `git add`**，執行 `git diff`
 3. 確認你看得懂 `+` 和 `-` 代表什麼
+
+<details>
+<summary>參考解答</summary>
+
+用 VS Code（或任何編輯器）打開 `index.html`，在 `<body>` 裡加一行內容，例如 `<p>歡迎來到我的網站</p>`，**存檔後先不要 `git add`**，直接執行：
+
+```bash
+git diff
+```
+
+你會看到類似這樣的輸出：
+
+```diff
+diff --git a/index.html b/index.html
+index abc1234..def5678 100644
+--- a/index.html
++++ b/index.html
+@@ -1 +1,2 @@
+ <!DOCTYPE html><html>...
++<p>歡迎來到我的網站</p>
+```
+
+怎麼讀這段：
+
+- **`+` 開頭（綠色）的行 = 你新增的內容**。
+- **`-` 開頭（紅色）的行 = 你刪除的內容**。這次只有新增，所以沒有 `-` 行。
+- 沒有 `+`/`-` 前綴的行是「沒動、只是顯示前後文」讓你看得懂改在哪裡。
+- `@@ -1 +1,2 @@` 標示改動發生在檔案的第幾行附近。
+
+`git diff` 比較的是「**現在工作目錄的檔案**」和「**上一個 commit**」的差異。因為你還沒 `git add`，所以看得到這些尚未進暫存區的改動——這正是 commit 之前用來「再確認一次自己到底改了什麼」的好習慣。**最終仍需自行執行驗證。**
+
+</details>
 
 ## 課外讀物
 

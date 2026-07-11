@@ -165,6 +165,65 @@ ls
 | 啟用 systemd | `systemctl is-system-running` | `running` 或 `degraded` |
 | 裝好 Docker | `docker run hello-world` | "Hello from Docker!" |
 
+<details>
+<summary>參考解答</summary>
+
+這是整章的核心動手題，**必須自行在你的 Windows / WSL 上實機做過並驗證**。把第一步到第五步照做一遍即可，關鍵是每一步都用驗證指令確認，別急著往下。以下是完整流程與各步驟的驗收點：
+
+1. **裝 Ubuntu**（PowerShell，系統管理員身分）：
+
+   ```powershell
+   wsl --install
+   ```
+
+   裝完**重開機**，第一次進 Ubuntu 會請你設帳號和密碼。設好後驗證：
+
+   ```bash
+   whoami
+   ```
+
+   **驗收點**：印出你剛設定的帳號名，就代表你已經身在 Linux 裡了。
+
+2. **啟用 systemd**（WSL 裡編輯 `/etc/wsl.conf`）：
+
+   ```bash
+   sudo vi /etc/wsl.conf
+   ```
+
+   加入：
+
+   ```ini
+   [boot]
+   systemd=true
+   ```
+
+   （vi 操作：按 `i` 編輯、`Esc` 退出、`:wq` 存檔離開。）然後回 PowerShell 跑 `wsl --shutdown` 完整關閉再重開，讓設定生效。重新進 Ubuntu 後驗證：
+
+   ```bash
+   systemctl is-system-running
+   ```
+
+   **驗收點**：回 `running`（或 `degraded` 也算正常啟動）就代表 systemd 已開啟，之後 Part 4 的 `systemctl`、`journalctl` 才能用。
+
+3. **裝 Docker**（WSL）：
+
+   ```bash
+   curl -fsSL https://get.docker.com | sudo sh
+   sudo usermod -aG docker $USER
+   ```
+
+   加完群組要 `wsl --shutdown` 再重進 WSL 才生效。驗證：
+
+   ```bash
+   docker run hello-world
+   ```
+
+   **驗收點**：看到 "Hello from Docker!" 就成功了。若出現權限錯誤（`permission denied`），多半是還沒重進 WSL 讓 `docker` 群組生效，重開一次即可。
+
+**常見卡關**：`systemctl` 說找不到或報錯 → 通常是第二步的 `wsl.conf` 沒存好、或忘了 `wsl --shutdown`；Docker 一定要 `sudo` 才能跑 → 是還沒重進 WSL 套用群組。都對照上面重做一次就好。
+
+</details>
+
 ---
 
 ### 練習 2：玩一下檔案互通
@@ -172,6 +231,26 @@ ls
 1. 在 WSL 跑 `cd /mnt/c` 然後 `ls`，找到你的 Windows 檔案。
 2. 在 Windows 檔案總管網址列輸入 `\\wsl$`，找到你的 Linux 檔案。
 3. 想想看：為什麼專案檔建議放在 WSL 家目錄、而不是 `/mnt/c`？
+
+<details>
+<summary>參考解答</summary>
+
+前兩題是動手題，**請自行在 WSL 與 Windows 檔案總管實機操作**；第 3 題是概念題，答案在課文的「小建議」裡。
+
+1. **從 WSL 看 Windows 檔案**：
+
+   ```bash
+   cd /mnt/c
+   ls
+   ```
+
+   **驗收點**：你會看到熟悉的 Windows `C:` 槽內容（`Users`、`Program Files` 等）。你的 Windows 磁碟被掛載在 WSL 的 `/mnt/` 底下——`C:` 就是 `/mnt/c`、`D:` 就是 `/mnt/d`，這正是 Part 2-4 會學的「掛載」概念。想進一步到你的使用者資料夾，可 `cd /mnt/c/Users/你的Windows使用者名稱`。
+
+2. **從 Windows 看 WSL 檔案**：在檔案總管網址列輸入 `\\wsl$` 按 Enter。**驗收點**：會出現一個像網路磁碟的地方，裡面是你的 Linux 發行版（例如 `Ubuntu`），點進去就是完整的 Linux 檔案系統（`/home`、`/etc`…），能像一般資料夾一樣瀏覽、拖拉檔案。
+
+3. **為什麼專案檔要放 WSL 家目錄（`/home/你的帳號/`）而不是 `/mnt/c`？** 因為 **`/mnt/c` 是「跨系統存取」，讀寫會慢很多**。當你在 WSL 裡動 `/mnt/c` 底下的檔案，其實是穿過 Windows 和 Linux 兩套檔案系統之間的橋樑，每次讀寫都要翻譯轉換，效能差；而 `/home` 是 WSL 原生的 Linux 檔案系統，讀寫是原生速度。差別在 `git` 操作、`docker build`、`npm install` 這種「大量小檔案讀寫」時特別明顯——放 WSL 家目錄可能快上好幾倍。所以規則很簡單：**平常寫程式、放專案，一律放 `/home/你的帳號/` 裡；`/mnt/c` 只在需要臨時存取 Windows 檔案時用。**
+
+</details>
 
 ---
 
@@ -187,6 +266,31 @@ pwd
 ```
 
 `~` 是「家目錄」的捷徑。`pwd`（Part 1-4 會學）會印出完整路徑，應該像 `/home/你的帳號/infra-practice`。這裡就是你之後做這門課練習的基地了。
+
+<details>
+<summary>參考解答</summary>
+
+這是動手題，**請自行在 WSL 終端機實機執行**。照課文的四行打就好：
+
+```bash
+cd ~
+mkdir infra-practice
+cd infra-practice
+pwd
+```
+
+逐行在做什麼：
+
+- `cd ~`：`~` 是家目錄捷徑，先回到 `/home/你的帳號/`。
+- `mkdir infra-practice`：建立名為 `infra-practice` 的新資料夾（`mkdir` = make directory）。
+- `cd infra-practice`：進到剛建好的資料夾裡。
+- `pwd`：印出「我現在在哪」的完整路徑（`pwd` = print working directory）。
+
+**驗收點**：最後 `pwd` 應該印出 `/home/你的帳號/infra-practice`（`你的帳號` 換成你安裝時設的名字）。看到這個路徑，就代表你的練習基地建好了，而且如同上一題所學——它落在 WSL 原生的家目錄底下，之後 git、Docker 操作都會最快。
+
+> 小提醒：如果 `mkdir` 說資料夾已存在，代表你之前已經建過，直接 `cd infra-practice` 進去用就好，不影響。
+
+</details>
 
 > 環境準備好了！接下來 Part 1 開始，你就能一邊讀、一邊在這個 WSL 環境裡動手。記得：少數「對外伺服器」的章節（防火牆對外、公開 HTTPS）再開 AWS EC2 來練即可。
 

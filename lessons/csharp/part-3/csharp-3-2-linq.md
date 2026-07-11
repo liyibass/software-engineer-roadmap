@@ -99,6 +99,72 @@ var list = query.ToList();               // 這時才真正跑
 2. 用 LINQ 對一個數字 List 算出「大於 5 的數字的總和」（提示：Where + Sum）。
 3. 用 `FirstOrDefault` 找「第一個大於 100 的數」（清單裡沒有），觀察它回傳預設值而非當掉，對比 `First` 會丟例外。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：篩長度 > 3、轉大寫、排序**
+
+用一連串方法串接：`Where` 篩選 → `Select` 轉大寫 → `OrderBy` 排序 → `ToList` 收集：
+
+```csharp
+using System.Linq;
+
+List<string> names = new List<string> { "Amy", "Robert", "Bo", "Charlie", "Ed" };
+
+var result = names
+    .Where(name => name.Length > 3)     // 長度大於 3：Robert, Charlie
+    .Select(name => name.ToUpper())      // 轉大寫：ROBERT, CHARLIE
+    .OrderBy(name => name)               // 字母序排序：CHARLIE, ROBERT
+    .ToList();
+
+Console.WriteLine(string.Join(", ", result));   // CHARLIE, ROBERT
+```
+
+驗收點：只保留長度大於 3 的名字、全部變大寫、且照字母順序排好。注意 `.Length > 3` 是「嚴格大於」，長度剛好 3 的（如 `Amy`）不會留下。
+
+**第 2 題：大於 5 的數字總和**
+
+先 `Where` 篩出大於 5 的，再 `Sum` 加總。也可以直接把條件寫進 `Sum` 的 Lambda，但拆成兩步比較清楚：
+
+```csharp
+List<int> numbers = new List<int> { 3, 7, 2, 9, 5, 11, 4 };
+
+int total = numbers
+    .Where(n => n > 5)      // 7, 9, 11
+    .Sum();                 // 7 + 9 + 11 = 27
+
+Console.WriteLine(total);   // 27
+```
+
+驗收點：印出 `27`（只加總大於 5 的 7、9、11；等於 5 的不算）。
+
+**第 3 題：`FirstOrDefault` vs `First`**
+
+`FirstOrDefault` 找不到符合的元素時**回傳該型別的預設值**（`int` 的預設值是 `0`），不會當掉；`First` 找不到則**丟出 `InvalidOperationException`**：
+
+```csharp
+List<int> numbers = new List<int> { 3, 7, 2, 9, 5 };
+
+// FirstOrDefault：清單裡沒有 > 100 的，回傳 int 的預設值 0，不當掉
+int safe = numbers.FirstOrDefault(n => n > 100);
+Console.WriteLine(safe);        // 0
+
+// First：找不到會丟例外，要用 try/catch 才不會讓程式崩潰
+try
+{
+    int risky = numbers.First(n => n > 100);
+    Console.WriteLine(risky);
+}
+catch (InvalidOperationException ex)
+{
+    Console.WriteLine($"First 找不到就丟例外：{ex.Message}");
+}
+```
+
+驗收點：`FirstOrDefault` 印出 `0`；`First` 進入 catch 區塊印出例外訊息。結論：**不確定有沒有符合的元素時，用 `FirstOrDefault` 較安全**；只有在「保證一定有」時才用 `First`。
+
+</details>
+
 ## 課外讀物
 
 > LINQ = 函式式風格 → **rust 課程 [rust-6-4] 迭代器**、**cs 課程 Part 8-3：函式式典範**

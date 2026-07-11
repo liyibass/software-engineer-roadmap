@@ -158,6 +158,44 @@ VITE_API_BASE=
 
 **練習 3**：檢查你的 `.gitignore` 有沒有包含 `.env`。然後想一想：如果你已經不小心把含機密的 `.env` commit 上去了，光是「之後再加進 `.gitignore`」夠不夠？（提示：git 會記住歷史……這跟 Git 的運作原理有關。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1（動手題，需自行實機驗證）**
+
+做法：
+1. 在前端專案根目錄建立 `.env`，寫入 `VITE_API_BASE=http://localhost:3000`（注意一定要有 `VITE_` 前綴）。
+2. 找到原本寫死的那行，改成從環境變數讀：
+
+```typescript
+// 改前
+const API_BASE = "http://localhost:3000"
+// 改後
+const API_BASE = import.meta.env.VITE_API_BASE
+```
+
+3. 因為 Vite 只在「啟動時」讀 `.env`，改完 `.env` 後要**重新啟動** `npm run dev`（熱更新不會重讀 `.env`）。
+
+驗收點：前端重啟後，Todo 的讀取／新增還是正常，代表 `fetch` 打的網址跟以前一樣。你可以暫時 `console.log(API_BASE)`，看到印出 `http://localhost:3000` 就對了。這題要在你自己的機器上跑起來確認，請自行實機驗證。
+
+**練習 2（動手題，需自行實機驗證）**
+
+在 `.env` 加一行 `SECRET=12345`（**故意不加** `VITE_` 前綴），然後在前端 `console.log(import.meta.env.SECRET)`。重啟 dev server 後，你會看到印出 `undefined`。
+
+為什麼？因為 Vite 的規則是「只有 `VITE_` 開頭的變數，才會被打包進前端讓瀏覽器讀得到」。`SECRET` 沒有前綴，Vite 就不把它交給前端——這正是保護機制：就算你手滑把機密（例如資料庫密碼）寫進 `.env`，只要沒加 `VITE_`，它也不會外洩到瀏覽器。把它改名成 `VITE_SECRET` 再讀一次，就會讀得到了——藉此對照出「有沒有前綴」造成的差別。
+
+**練習 3**
+
+不夠。關鍵在於：**Git 會把每一次 commit 都永久記進歷史**。你今天把 `.env` 加進 `.gitignore`，只能讓「之後」不再追蹤它，但「之前」那次已經 commit 進去的機密，仍然躺在 git 歷史裡——任何人 clone 下來 `git log` 翻舊 commit 就看得到。
+
+所以正確的補救有兩步，缺一不可：
+1. **先當作機密已外洩來處理**：立刻把那把密鑰／密碼「作廢並換新」（rotate）。因為只要它曾經推上遠端，就必須假設已經有人看過了，換一把新的才是真正止血。
+2. **再清理歷史**：用 `git filter-repo`（或舊工具 BFG）把該檔案從整個歷史裡抹掉，並強制推送覆蓋遠端。但這對已經 clone 過或 fork 過的人無效——所以第 1 步的「換新」永遠是根本解法。
+
+一句話總結：把機密推上 git 這件事「無法真正收回」，只能靠「換掉那個機密」來止損。這也是為什麼一開始就把 `.env` 放進 `.gitignore` 這麼重要。
+
+</details>
+
 ---
 
 ## 課外讀物

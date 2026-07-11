@@ -123,17 +123,76 @@ ECR 就是這趟旅程的「倉庫中繼站」——image 先進倉庫，運算�
 
 回答：容器部署為什麼需要一個「image 倉庫」？它在「build」和「run」之間扮演什麼角色？
 
+<details>
+<summary>參考解答</summary>
+
+**為什麼需要**：你在本機或 CI 把 image build 好，但真正要跑容器的是「雲端的機器」（ECS/EKS 的運算資源）。build 的地方和 run 的地方通常不是同一台，那 image 要怎麼從「build 的地方」交到「run 的地方」手上？總不能每台機器都自己 build 一次。所以需要一個大家都能存取的地方來「存放與分發 image」。
+
+**扮演的角色**：image 倉庫是 **build 和 run 之間的橋樑（中繼站）**。流程是：① build image → ② push 到倉庫 → ③ 容器平台從倉庫 pull → ④ 跑成容器。image 先進倉庫，運算平台再從倉庫取貨。有了這個中繼站，「誰 build」和「在哪 run」就解耦了——build 一次，任何有權限的機器都能拉同一份、跑出一模一樣的容器。
+
+</details>
+
 ---
 
 ### 練習 2：ECR vs Docker Hub
 
 回答：為什麼公司自己的 image 適合放 ECR 而不是公開的 Docker Hub？（至少兩個理由）
 
+<details>
+<summary>參考解答</summary>
+
+至少兩個理由（能講到「私有安全」和「和 AWS 整合」就到位）：
+
+- **私有、安全**：公司自己的 image 裡可能含商業邏輯、設定，是機密，不該放在公開的地方。ECR 是私有倉庫，而且用 **IAM 權限**（aws-2-1）控制誰能 push / pull，安全可控。
+- **和 AWS 深度整合**：ECS/EKS 拉 ECR 的 image 很順，權限直接用 **IAM Role** 管理——不用像連 Docker Hub 那樣另外設一組帳號密碼。
+- **快**：image 和你的運算資源（EC2/Fargate）在同一個 AWS 網路裡，pull 起來又快又不用走外部網路（也省流量費）。
+
+（相對地，Docker Hub 比較適合放「公開 image、開源專案」，例如官方 nginx。）
+
+</details>
+
 ---
 
 ### 練習 3：理解流程
 
 不看上面，描述「把一個 image 放上 ECR、讓 ECS 使用」的大致步驟（build → tag → push → ECS 拉取）。
+
+<details>
+<summary>參考解答</summary>
+
+大致五步（能講出「建 repo → 登入 → build → tag → push → ECS 拉」的順序就對了）：
+
+1. **在 ECR 建一個 repository**（放這個 image 的地方，像 Docker Hub 的一個 repo）。
+2. **登入 ECR**（用 AWS 權限換取 docker 登入）：
+
+   ```bash
+   aws ecr get-login-password --region ap-northeast-1 | \
+     docker login --username AWS --password-stdin <你的帳號>.dkr.ecr.ap-northeast-1.amazonaws.com
+   ```
+
+3. **build image**：
+
+   ```bash
+   docker build -t my-app .
+   ```
+
+4. **tag 成 ECR 的位址**（把 image 標上 ECR repository 的完整位址）：
+
+   ```bash
+   docker tag my-app:latest <你的帳號>.dkr.ecr.ap-northeast-1.amazonaws.com/my-app:latest
+   ```
+
+5. **push 到 ECR**：
+
+   ```bash
+   docker push <你的帳號>.dkr.ecr.ap-northeast-1.amazonaws.com/my-app:latest
+   ```
+
+6. **ECS 拉取**：在 ECS 的 Task Definition 裡把 Image URI 指向這個 ECR 位址，ECS 部署時就會用它的 **IAM Role** 自動取得權限、從 ECR pull 下來跑成容器（不用另外設帳密）。
+
+實務上第 2~5 步通常不是手動做，而是交給 CI/CD（如 GitHub Actions）自動跑（Part 9）。
+
+</details>
 
 ## 課外讀物
 

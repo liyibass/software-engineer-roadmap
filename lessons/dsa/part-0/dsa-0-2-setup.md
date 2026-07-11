@@ -90,6 +90,63 @@ console.log(binarySearch([], 1));                // 預期 -1（空陣列邊界�
 2. 自己多加幾組測試案例驗證 `binarySearch`：找陣列第一個、最後一個元素，各預期回傳什麼？
 3. 觀察 `binarySearch` 的程式碼（先不用完全懂），對照 [dsa-0-1] 的「每次砍一半」描述，找出「砍一半」對應的是哪幾行。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**
+
+把本章的 `binarySearch` 貼進 TypeScript 官方 Playground（或本機用 `npx tsx your-algo.ts`），再加一行呼叫來看結果。例如：
+
+```typescript
+function binarySearch(sortedArray: number[], target: number): number {
+  let low = 0;
+  let high = sortedArray.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (sortedArray[mid] === target) {
+      return mid;
+    } else if (sortedArray[mid] < target) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return -1;
+}
+
+console.log(binarySearch([1, 3, 5, 7, 9], 7)); // 3
+```
+
+只要 Playground 右邊（或終端機）印出 `3`，就代表你的環境跑得起來了。
+
+**第 2 題**
+
+用陣列 `[1, 3, 5, 7, 9]`（位置 0~4）來測「第一個」和「最後一個」元素：
+
+```typescript
+console.log(binarySearch([1, 3, 5, 7, 9], 1)); // 預期 0（第一個元素在位置 0）
+console.log(binarySearch([1, 3, 5, 7, 9], 9)); // 預期 4（最後一個元素在位置 4）
+```
+
+回傳的是「**位置（index）**」而不是值：找第一個元素 `1` 回傳 `0`，找最後一個元素 `9` 回傳 `4`。這兩個是常見的「邊界情況」——目標剛好在頭或尾，很值得每次都測一下。
+
+**第 3 題**
+
+「砍一半」對應的是這三行（更新搜尋範圍的邊界）：
+
+```typescript
+const mid = Math.floor((low + high) / 2); // 取目前範圍的中間
+...
+low = mid + 1;   // 目標比中間大 → 丟掉左半，只留右半
+...
+high = mid - 1;  // 目標比中間小 → 丟掉右半，只留左半
+```
+
+關鍵在 `low = mid + 1` 和 `high = mid - 1`：每執行到其中一行，就把 `low`~`high` 這段還要搜尋的範圍砍掉大約一半——這正是 [dsa-0-1] 說的「每次把範圍砍一半」。而 `mid` 那行負責找出砍的位置（中間點）。
+
+</details>
+
 ## 課外讀物
 
 > TypeScript 基礎與型別 → **basic 課程 Part 2**、[課外讀物 E-6-4：TypeScript 最佳實踐](../../../課外讀物/E-6-best-practices/E-6-4-typescript-best-practices.md)

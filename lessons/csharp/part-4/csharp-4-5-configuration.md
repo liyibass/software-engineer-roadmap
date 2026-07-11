@@ -128,6 +128,89 @@ graph TB
 2. 建一個 `appsettings.Development.json`，覆蓋某個設定值，觀察開發環境用的是覆蓋後的值。
 3. 思考題：為什麼資料庫密碼「絕對不能寫進 appsettings.json 並進 Git」？正確該放哪？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：加一組自訂設定、注入 `IConfiguration` 讀出來印在端點（動手題）**
+
+在 `appsettings.json` 加一組設定：
+
+```json
+{
+  "AppSettings": {
+    "SiteName": "我的 API"
+  }
+}
+```
+
+寫一個端點注入 `IConfiguration` 讀出來。用 Controller 的話：
+
+```csharp
+[ApiController]
+[Route("[controller]")]
+public class SiteController : ControllerBase
+{
+    private readonly IConfiguration _config;
+
+    public SiteController(IConfiguration config)   // 注入設定
+    {
+        _config = config;
+    }
+
+    [HttpGet("name")]
+    public string GetSiteName() => _config["AppSettings:SiteName"];
+    //                                     ↑ 用冒號存取巢狀設定
+}
+```
+
+（若用 Minimal API，也可以：`app.MapGet("/site/name", (IConfiguration config) => config["AppSettings:SiteName"]);`）
+
+驗收點：
+
+- 打 `GET /site/name`，回傳 `我的 API`。
+- 若回傳 `null`，多半是鍵的路徑打錯（區段名與鍵名要跟 JSON 完全一致，用冒號分隔）。
+
+> 這一步要實機跑起來、打端點觀察輸出，請自行驗證。
+
+**第 2 題：建 `appsettings.Development.json` 覆蓋設定值（動手題）**
+
+在專案根目錄建 `appsettings.Development.json`：
+
+```json
+{
+  "AppSettings": {
+    "SiteName": "我的 API（開發環境）"
+  }
+}
+```
+
+原理：ASP.NET Core 依環境變數 `ASPNETCORE_ENVIRONMENT` 載入對應檔並**覆蓋**基礎的 `appsettings.json`。開發時該變數預設是 `Development`（範本的 `launchSettings.json` 已設好），所以會載入這份覆蓋檔。
+
+驗收點：
+
+- `dotnet run`（預設就是 Development 環境）後打 `GET /site/name`，回傳的是**覆蓋後的值**「我的 API（開發環境）」，而不是 `appsettings.json` 裡的「我的 API」。
+- 想對照正式環境行為，可在啟動前設 `ASPNETCORE_ENVIRONMENT=Production`（此時沒有 Production 覆蓋檔，就會用回 `appsettings.json` 的基礎值）。
+- 驗證了「分層覆蓋」：共用的放 `appsettings.json`，各環境不同的放 `appsettings.{環境}.json`。
+
+> 這一步要實機切換／觀察不同環境的讀取結果，請自行驗證。
+
+**第 3 題：為什麼資料庫密碼絕不能寫進 appsettings.json 並進 Git？該放哪？**
+
+**為什麼不能**：`appsettings.json` 是會被 `git commit` 進版控的檔案。一旦密碼寫進去並推上去（尤其是公開 repo，甚至私有 repo 也一樣），就等於把鑰匙公開了：
+
+- Git 有**完整歷史**——就算你之後把密碼刪掉再 commit，舊的 commit 裡還留著，任何人 clone 下來翻歷史都看得到。所以「進過 Git 就視為已外洩」，補救方式是**立刻作廢那組密碼、重發新的**，光刪檔沒用。
+- 機密外洩可能導致資料庫被入侵、資料被竊或被刪，是嚴重的安全事故。
+
+**正確該放哪**：機密要放在「程式碼（版控）之外」——
+
+- **開發時**：用 **User Secrets**（`dotnet user-secrets set "Key" "value"`）。它存在你電腦的本機使用者目錄、不在專案資料夾內，天生不會進 Git。
+- **正式時**：用**環境變數**，或雲端的密鑰管理服務（如 AWS Secrets Manager）。
+- **鐵則**：`appsettings.json` 裡只放「非機密」設定；任何含機密的檔案都要用 `.gitignore` 排除。ASP.NET Core 的分層覆蓋機制會讓環境變數/User Secrets 自動覆蓋掉 `appsettings.json`，所以程式讀取方式不變，機密卻不進版控。
+
+[csharp-9-3] 會更深入講機密管理。
+
+</details>
+
 ## 課外讀物
 
 > 機密管理、別進 Git → **rust 課程 [rust-9-5]**、[課外讀物 E-10：Web Security](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)、[課外讀物 E-8：Git](../../../課外讀物/E-8-git/E-8-1-git-internals.md)

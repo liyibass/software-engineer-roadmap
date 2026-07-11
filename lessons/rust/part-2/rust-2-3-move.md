@@ -117,6 +117,75 @@ fn print_it(text: String) {
 2. 寫一個函式 `fn consume(s: String)`，在 `main` 把一個 `String` 傳進去，然後嘗試在呼叫後再用它，觀察錯誤。再用 `.clone()` 修好它。
 3. 思考題：為什麼 Rust 對 `String` 用「移動」，但（下一章會看到）對 `i32` 這種整數卻是「直接複製、原本還能用」？（提示：和「資料在堆疊還堆積、大小固不固定」有關。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**
+
+```rust
+fn main() {
+    let a = String::from("哈囉");
+    let b = a;              // 移動：擁有權 a → b，a 失效
+    println!("{}", b);      // ✅ b 是現在的擁有者
+    println!("{}", a);      // ❌ 編譯錯誤：a 的值已被移動
+}
+```
+
+跑起來會看到：
+
+```
+error[E0382]: borrow of moved value: `a`
+  |   let b = a;
+  |           - value moved here      ← a 的值在這裡被移走
+  |   println!("{}", a);
+  |                  ^ value borrowed here after move   ← 你又在這裡用了它
+```
+
+兩行標示分別告訴你「值在哪裡被移走」與「你在哪裡又用了已被移走的值」，這是讀懂 move 錯誤的關鍵。
+
+**第 2 題**
+
+會出錯的版本：
+
+```rust
+fn main() {
+    let s = String::from("哈囉");
+    consume(s);              // s 的擁有權移動進函式
+    // println!("{}", s);    // ❌ s 已失效：value borrowed here after move
+}
+
+fn consume(s: String) {
+    println!("吃掉：{}", s);
+} // ← 參數 s 在這裡離開範圍、被清理
+```
+
+用 `.clone()` 修好：
+
+```rust
+fn main() {
+    let s = String::from("哈囉");
+    consume(s.clone());        // 複製一份丟進去，原本的 s 保留
+    println!("原本的還能用：{}", s); // ✅ OK
+}
+
+fn consume(s: String) {
+    println!("吃掉：{}", s);
+}
+```
+
+`clone()` 真的複製了整塊堆積資料，所以 `main` 裡的 `s` 和函式收到的是**兩份獨立**的資料，函式清掉它那份不影響 `main` 的那份。（不過如果只是想讓函式「讀一下」，更好的做法是下一章的借用 `&`，成本比 clone 低。）
+
+**第 3 題**
+
+因為兩者「資料放在哪、複製貴不貴」完全不同：
+
+- `i32` 這種整數**完全待在堆疊上、大小固定**（就 4 個位元組）。要複製它，只是原地多印一份小數字，成本微乎其微。既然複製這麼便宜，Rust 乾脆複製，讓原變數和新變數都能用，皆大歡喜——這就是下一章的 `Copy`。
+- `String` 的把手雖在堆疊，但**真正的字元內容在堆積、而且可能很大**。如果賦值時偷偷把整塊堆積資料深拷貝一份，會默默拖慢程式（違反「不偷偷做昂貴的事」）。所以 Rust 選擇移動：不複製資料，只把擁有權交棒給新變數，並讓舊變數失效，藉此維持「唯一擁有者」又避免 double free。
+
+一句話：**小又固定、複製便宜 → 複製（Copy）；擁有堆積資料、複製昂貴 → 移動（Move）。**
+
+</details>
+
 ## 課外讀物
 
 > 「移動 vs 複製」背後是堆疊/堆積的差異 → 複習 [rust-2-1] 與 **cs 課程 Part 3、5**

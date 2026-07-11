@@ -125,6 +125,86 @@ fn main() {
 2. 寫一個泛型函式 `fn print_area<T: Shape>(shape: T)`，印出任何形狀的面積。用兩種形狀測試。
 3. 給 `Shape` 加一個**預設方法** `describe(&self)`，印出「這個形狀面積是 ___」（內部呼叫 `self.area()`）。確認兩種形狀不用各自實作就能用。
 
+<details>
+<summary>參考解答</summary>
+
+這三題是同一份程式的漸進疊加，最後合起來看。
+
+**第 1 題：定義 `Shape` trait，並為 `Circle`、`Rectangle` 實作 `area`**
+
+trait 只規定「要有一個 `area` 方法」，各型別自己算面積：
+
+```rust
+trait Shape {
+    fn area(&self) -> f64;
+}
+
+struct Circle {
+    radius: f64,
+}
+
+struct Rectangle {
+    width: f64,
+    height: f64,
+}
+
+impl Shape for Circle {
+    fn area(&self) -> f64 {
+        std::f64::consts::PI * self.radius * self.radius
+    }
+}
+
+impl Shape for Rectangle {
+    fn area(&self) -> f64 {
+        self.width * self.height
+    }
+}
+```
+
+`std::f64::consts::PI` 是標準庫提供的圓周率常數，比自己寫 `3.14159` 精確。
+
+**第 2 題：泛型函式 `print_area`**
+
+用 `<T: Shape>` 限制「傳進來的東西一定會 `area()`」，函式內就能安心呼叫：
+
+```rust
+fn print_area<T: Shape>(shape: T) {
+    println!("面積是 {}", shape.area());
+}
+
+fn main() {
+    print_area(Circle { radius: 2.0 });                 // 面積是 12.566...
+    print_area(Rectangle { width: 3.0, height: 4.0 });  // 面積是 12
+}
+```
+
+**第 3 題：給 `Shape` 加預設方法 `describe`**
+
+把 `describe` 直接寫在 trait 裡並附上實作，它內部呼叫 `self.area()`。因為有預設實作，`Circle`、`Rectangle` 都不用各自再寫一次：
+
+```rust
+trait Shape {
+    fn area(&self) -> f64;
+
+    // 預設方法：用到上面的 area()
+    fn describe(&self) {
+        println!("這個形狀面積是 {}", self.area());
+    }
+}
+
+// Circle、Rectangle 的 impl 只需實作 area，describe 自動就有
+fn main() {
+    let c = Circle { radius: 1.0 };
+    let r = Rectangle { width: 2.0, height: 5.0 };
+    c.describe();   // 這個形狀面積是 3.14159...
+    r.describe();   // 這個形狀面積是 10
+}
+```
+
+重點：`describe` 只寫一次、寫在 trait 裡，所有實作者共享——這就是預設方法的價值，避免每個型別重複寫一樣的東西。當然，若某個型別想要不一樣的 `describe`，也可以在自己的 `impl` 裡覆寫掉預設版本。
+
+</details>
+
 ## 課外讀物
 
 > trait 是「介面」，設計時遵守介面隔離（別讓介面太肥） → [課外讀物 E-7-5：介面隔離原則](../../../課外讀物/E-7-solid/E-7-5-isp.md)

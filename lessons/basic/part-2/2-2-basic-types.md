@@ -251,6 +251,28 @@ const discount = null
 
 `discount` 被推斷成什麼型別？和你預期的一樣嗎？
 
+<details>
+<summary>參考解答</summary>
+
+這題需要你自己在 VS Code 裡把滑鼠移上去實機驗證。把滑鼠停在每個變數上，你會看到：
+
+- `productName` → `string`
+- `price` → `number`
+- `inStock` → `boolean`
+- `discount` → `null`
+
+`discount` 被推斷成 `null` 型別。這可能跟你預期的不太一樣——你原本大概想的是「這裡以後要放折扣數字」，但你只給了 `null`，TypeScript 只能照它看到的推斷成 `null`。也就是說，這個變數目前「只能是 null」，你之後想塞數字進去反而會報錯。
+
+如果你的本意是「現在沒有折扣，之後可能會有數字」，應該明確寫成 union type：
+
+```typescript
+const discount: number | null = null
+```
+
+這樣才表達得出「要嘛是數字，要嘛明確是空的」。
+
+</details>
+
 **練習 2：Union Type 練習**
 
 寫一個函式 `formatId`，它接收一個 `id` 參數（可以是 `string` 或 `number`），統一回傳加上前綴的字串：
@@ -263,11 +285,64 @@ const discount = null
 
 提示：回傳型別是 `string`，函式內可以用 template literal 把 `id` 直接放進去。
 
+<details>
+<summary>參考解答</summary>
+
+參數用 `string | number` 這個 union type，回傳值是 `string`。因為 template literal 會自動把 `id`（不管是字串還是數字）轉成文字放進去，所以函式內部不用特別判斷型別：
+
+```typescript
+function formatId(id: string | number): string {
+  return `ID-${id}`
+}
+
+console.log(formatId("abc")) // "ID-abc"
+console.log(formatId(123)) // "ID-123"
+```
+
+關鍵在於 `${id}` 這個 template literal：不論 `id` 是 `"abc"` 還是 `123`，塞進反引號字串時都會被轉成文字，最後回傳的一定是 `string`。
+
+</details>
+
 **練習 3：Literal Type 練習**
 
 定義一個 `Season` 型別，只允許 `"spring"`、`"summer"`、`"autumn"`、`"winter"` 四個值。
 
 然後寫一個函式 `getSeasonMessage`，接收 `Season` 型別的參數，根據季節回傳不同的字串訊息。確認傳入 `"rainy"` 時 TypeScript 會報錯。
+
+<details>
+<summary>參考解答</summary>
+
+先用 literal type 定義 `Season`，把四個合法字串用 `|` 連起來；函式參數標注成 `Season`，這樣傳入不在清單裡的值就會被擋下來：
+
+```typescript
+type Season = "spring" | "summer" | "autumn" | "winter"
+
+function getSeasonMessage(season: Season): string {
+  switch (season) {
+    case "spring":
+      return "春天到了，櫻花開了！"
+    case "summer":
+      return "夏天好熱，記得多喝水。"
+    case "autumn":
+      return "秋高氣爽，適合出遊。"
+    case "winter":
+      return "冬天冷颼颼，多穿一點。"
+  }
+}
+
+console.log(getSeasonMessage("spring")) // OK
+getSeasonMessage("rainy") // Error！"rainy" 不是合法的 Season
+```
+
+傳入 `"rainy"` 時，TypeScript 會報錯：
+
+```
+Argument of type '"rainy"' is not assignable to parameter of type 'Season'.
+```
+
+因為 `"rainy"` 不在 `Season` 允許的四個值裡。另外，用 `switch` 一一列出四個季節時，因為 `Season` 已經限定只有這四種，TypeScript 也能確認你有沒有漏掉哪個 case，每條路徑都有 `return`，回傳型別 `string` 才成立。
+
+</details>
 
 ---
 

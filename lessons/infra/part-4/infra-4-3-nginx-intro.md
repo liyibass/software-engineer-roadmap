@@ -169,11 +169,60 @@ sudo systemctl reload nginx
 
 不看上面，用「大樓櫃台」的類比，向朋友解釋什麼是反向代理、為什麼後端服務要躲在 Nginx 後面。
 
+<details>
+<summary>參考解答</summary>
+
+這是口說練習，能講出下面的意思就算過關。示範講法：
+
+> 「你可以把伺服器想成一棟辦公大樓，裡面有好幾間公司（就是我後端的各個服務，各自聽在不同的 port，像 3000、4000）。訪客不會自己在大樓裡亂闖去敲某間辦公室的門，而是**先到一樓的大廳櫃台**。櫃台會看你要找誰、要辦什麼，再把你**帶去對的辦公室**。
+>
+> Nginx 就是這個櫃台。所有外部請求都先到 Nginx（它聽在大家都會連的 80／443），Nginx 再依網址把請求**轉交（代理）給後面對應的服務**。因為它是站在『伺服器這一側』代替後端接客，方向跟一般幫使用者出門的代理相反，所以叫『**反向**代理』。」
+
+**為什麼後端要躲在 Nginx 後面？** 至少講出這幾點其中兩三個：
+
+- **統一入口**：使用者只要連 80／443，不用管後面是哪個服務、哪個 port。
+- **保護後端**：後端只聽 `localhost`，不直接暴露在網路上，外人打不到，安全得多。
+- **集中處理雜事**：HTTPS 憑證、靜態檔案、壓縮這些，裝在 Nginx 一處就好，後端不用各自重做（下一章的 HTTPS 就是裝在 Nginx 上）。
+- **好擴充**：之後後端變多台，Nginx 還能幫忙分流（負載平衡）。
+
+</details>
+
 ---
 
 ### 練習 2：安裝並確認 Nginx
 
 在你的伺服器上裝好 Nginx，確認 `systemctl status nginx` 是 running，並從瀏覽器連你的 IP 看到歡迎頁。如果連不到，回想 Part 3-3——是不是防火牆沒開 80？
+
+<details>
+<summary>參考解答</summary>
+
+這是動手題，需要**在自己的伺服器上實機操作**。完整步驟：
+
+```bash
+# 安裝
+sudo apt update
+sudo apt install nginx
+
+# 確認服務狀態（Part 4-1 學的）
+systemctl status nginx        # 要看到 active (running)
+
+# 放行防火牆的 80（Part 3-3 學的 ufw）
+sudo ufw allow 'Nginx HTTP'   # 或 sudo ufw allow 80
+sudo ufw status               # 確認 80 有在放行清單裡
+```
+
+然後在**你自己電腦的瀏覽器**輸入 `http://你的伺服器IP`，應該看到 Nginx 預設的「Welcome to nginx!」歡迎頁。
+
+**連不到的排查（照 Part 3-4 分層思路）：**
+
+1. **服務有活嗎？** `systemctl status nginx` 不是 running 的話，先 `sudo systemctl start nginx`。
+2. **防火牆開了嗎？** `sudo ufw status` 看有沒有放行 80。這是最常見的兇手——本地 `curl localhost` 連得到、但外面連不到，幾乎都是防火牆。
+3. **雲端安全群組（Security Group）呢？** 很多雲平台（AWS、GCP 等）除了機器內的 `ufw`，外層還有一道防火牆，也要放行 80。
+4. **在伺服器上自測**：`curl http://localhost` 若回得到 HTML，代表 Nginx 本身沒問題，那問題一定出在「外部到伺服器」這段（防火牆／安全群組）。
+
+**驗收點**：瀏覽器看到 Nginx 歡迎頁，且 `systemctl status nginx` 為 `active (running)`。
+
+</details>
 
 ---
 
@@ -186,6 +235,29 @@ reload nginx ／ nginx -t ／ 編輯 sites-available ／ 建立 sites-enabled �
 ```
 
 > 提示：寫設定 → 啟用 → **先測試** → 再重載。那個「先測試」是老手不會跳過的保命步驟。
+
+<details>
+<summary>參考解答</summary>
+
+正確順序與每一步的目的：
+
+1. **編輯 `sites-available`**（`sudo vi /etc/nginx/sites-available/myapp`）
+   - 在「草稿區」寫好這個網站的設定（反向代理、`server_name` 等）。放這裡還不會生效，像先寫好草稿。
+
+2. **建立 `sites-enabled` 連結**（`sudo ln -s .../sites-available/myapp /etc/nginx/sites-enabled/`）
+   - 把草稿「啟用」——在已啟用資料夾裡建一個指向草稿的符號連結（捷徑）。Nginx 實際只讀 `sites-enabled` 裡的設定，建了連結它才會納入。
+
+3. **`sudo nginx -t`（先測試）**
+   - 檢查設定語法有沒有寫錯。**這是保命步驟**：如果設定有錯卻直接重載，Nginx 可能會載入失敗、導致整個網站掛掉（連原本好好的站也一起沒了）。先測試，確認 `syntax is ok / test is successful` 再往下。
+
+4. **`sudo systemctl reload nginx`（再重載）**
+   - 讓 Nginx 套用新設定。用 `reload` 不用 `restart`，是因為 `reload` 不中斷現有連線地重新載入設定，對線上服務更溫和。
+
+**一句話記法**：寫（available）→ 啟用（enabled 連結）→ **測（nginx -t）** → 載（reload）。那個「先測試再重載」的習慣，能幫你擋掉大多數「改個設定結果整站掛掉」的意外。
+
+**驗收點**：能把四個動作按此順序排出，並說明「為什麼 `nginx -t` 一定要在 `reload` 之前」。
+
+</details>
 
 ## 課外讀物
 

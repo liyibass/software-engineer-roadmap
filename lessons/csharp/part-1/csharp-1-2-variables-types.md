@@ -94,6 +94,69 @@ Console.WriteLine(arr1[0]);   // 99！arr1 也變了（因為是同一份資料�
 2. 重現「值型別賦值各自獨立」vs「參考型別賦值指向同一份」的兩個例子，親眼看差別。
 3. 思考題：`int` 是值型別還參考型別？`string` 呢？陣列呢？（提示：看上面的分類。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：宣告各種型別並印出，再用 var 改寫**
+
+先寫明確型別版：
+
+```csharp
+int count = 10;
+double price = 19.99;
+bool isActive = true;
+string name = "Amy";
+
+Console.WriteLine(count);      // 10
+Console.WriteLine(price);      // 19.99
+Console.WriteLine(isActive);   // True
+Console.WriteLine(name);       // Amy
+```
+
+用 `var` 改寫（因為右邊初始值一看就知道型別，適合用 `var`）：
+
+```csharp
+var count = 10;         // 推斷成 int
+var price = 19.99;      // 推斷成 double
+var isActive = true;    // 推斷成 bool
+var name = "Amy";       // 推斷成 string
+
+Console.WriteLine(count);
+Console.WriteLine(price);
+Console.WriteLine(isActive);
+Console.WriteLine(name);
+```
+
+怎麼確認推斷正確？可以印 `count.GetType()`，會印出 `System.Int32`（就是 int）。重點：`var` 不是動態型別，型別在編譯期就被推斷固定了，之後 `count = "hi";` 一樣會編譯錯誤。
+
+**練習 2：重現「值型別各自獨立」vs「參考型別指向同一份」**
+
+```csharp
+// 值型別：複製「值本身」→ 兩個獨立
+int a = 5;
+int b = a;        // b 拿到 5 的複本
+b = 99;
+Console.WriteLine($"a = {a}, b = {b}");   // a = 5, b = 99（a 不受影響）
+
+// 參考型別：複製「參考」→ 指向同一份資料
+int[] arr1 = { 1, 2, 3 };
+int[] arr2 = arr1;      // arr2 拿到的是「同一個地址」
+arr2[0] = 99;
+Console.WriteLine($"arr1[0] = {arr1[0]}, arr2[0] = {arr2[0]}");  // 都是 99
+```
+
+親眼看到的差別：改 `b` 不影響 `a`（各自獨立的值）；但改 `arr2[0]` 卻讓 `arr1[0]` 也變了——因為兩個變數存的是「同一個地址」，指向同一份資料。這正是新手最常踩的坑。
+
+**練習 3：思考題——各是值型別還參考型別？**
+
+- `int`：**值型別**。變數盒子裡直接裝著整數本身。
+- `string`：**參考型別**。變數存的是「指向字串資料的參考」，資料在堆積上。（小補充：`string` 雖是參考型別，但它是「不可變 immutable」的，所以用起來常常感覺像值型別——這是它特別的地方。）
+- 陣列（例如 `int[]`）：**參考型別**。所以練習 2 才會出現「`arr2` 改了 `arr1` 也變」的現象。
+
+判斷方法就是回到本章分類：`int/long/double/bool/char/struct` 是值型別；`string/陣列/class 物件/List` 是參考型別。
+
+</details>
+
 ## 課外讀物
 
 > 值/參考、堆疊堆積、記憶體位址的底層 → **cs 課程 Part 3-5**、**rust 課程 [rust-2-1]（堆疊堆積）**

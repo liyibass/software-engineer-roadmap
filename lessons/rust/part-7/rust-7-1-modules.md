@@ -110,6 +110,76 @@ fn main() {
 2. 在 `greetings` 裡多放一個「沒有 `pub`」的函式，試著從 `main` 呼叫它，觀察編譯器說它私有。
 3. 用 `use` 把 `greetings::hello` 引進來，改成直接呼叫 `hello()`。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：定義模組 `greetings`，裡面放一個 `pub fn hello()`，在 `main` 用完整路徑 `greetings::hello()` 呼叫。
+
+```rust
+mod greetings {
+    pub fn hello() {                 // pub = 公開，main 才看得到
+        println!("哈囉，歡迎來到 Rust！");
+    }
+}
+
+fn main() {
+    greetings::hello();              // 用「模組名::函式」的路徑存取
+}
+```
+
+重點：`hello` 一定要加 `pub`，不然模組外（`main`）碰不到它——因為模組裡的東西預設是私有的。
+
+**第 2 題**：在 `greetings` 裡再放一個「沒有 `pub`」的函式（例如 `secret`），然後從 `main` 呼叫看看。
+
+```rust
+mod greetings {
+    pub fn hello() {
+        println!("哈囉！");
+    }
+
+    fn secret() {                    // 沒有 pub，就是私有的
+        println!("這是內部小祕密");
+    }
+}
+
+fn main() {
+    greetings::hello();
+    greetings::secret();             // ❌ 這行會編譯失敗
+}
+```
+
+編譯時你會看到類似這樣的錯誤：
+
+```
+error[E0603]: function `secret` is private
+  --> src/main.rs
+   |
+   |     greetings::secret();
+   |                ^^^^^^ private function
+```
+
+編譯器明確告訴你 `secret` 是私有的（`private function`），模組外用不了。這正是「預設私有」在保護你：內部細節不會不小心被外面依賴。如果真的想開放，就得幫 `secret` 加上 `pub`。
+
+**第 3 題**：用 `use` 把 `greetings::hello` 引進當前範圍，之後就能直接寫 `hello()`，省掉每次都打長路徑。
+
+```rust
+mod greetings {
+    pub fn hello() {
+        println!("哈囉！");
+    }
+}
+
+use greetings::hello;               // 把 hello 引進來
+
+fn main() {
+    hello();                        // 直接用短名字，不用寫 greetings::hello
+}
+```
+
+`use greetings::hello;` 之後，`hello` 這個名字就在 `main` 所在的範圍可用了。這和你之前寫的 `use std::collections::HashMap;` 是同一個機制。
+
+</details>
+
 ## 課外讀物
 
 > 「封裝、只暴露必要介面」是降低耦合的關鍵 → [課外讀物 E-7-5：介面隔離原則](../../../課外讀物/E-7-solid/E-7-5-isp.md)、[課外讀物 E-6-1：什麼是 Clean Code](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)

@@ -358,6 +358,37 @@ function getUserName(): Promise<string> {
 }
 ```
 
+<details>
+<summary>參考解答</summary>
+
+用 `async/await` 搭配 `try/catch` 改寫：
+
+```typescript
+async function getUserName(): Promise<string> {
+  try {
+    const res = await fetch("https://api.example.com/user")
+    const user = await res.json()
+    return user.name
+  } catch {
+    return "匿名使用者"
+  }
+}
+```
+
+對照說明（每個 `.then` 對應一行 `await`）：
+
+- `.then(res => res.json())` → `const user = await res.json()`（其中 `res` 來自 `await fetch(...)`）
+- `.then(user => user.name)` → `return user.name`
+- `.catch(() => "匿名使用者")` → `try/catch` 的 `catch` 區塊回傳 `"匿名使用者"`
+
+重點：
+
+- 函式加了 `async`，所以它的回傳型別仍是 `Promise<string>`——`async` 函式一定回傳 Promise，即使你 `return` 的是一個字串，也會自動被包成 `Promise<string>`。
+- `catch` 這裡沒用到 error 參數，可以寫成 `catch {}`（省略括號，這是新版語法）。原本的 `.catch(() => ...)` 也是不看錯誤內容、直接給預設值，兩者行為一致。
+- 可以看到 `async/await` 版本是「從上到下一行一行讀」，比 `.then()` 鏈更貼近直覺，這正是本章說的「讓非同步看起來像同步」。
+
+</details>
+
 **練習二**
 
 寫一個 `simulateSave` 函式，模擬「儲存資料到伺服器」這個動作：
@@ -368,6 +399,52 @@ function getUserName(): Promise<string> {
 
 用 `async/await` 和 `try/catch` 實作，呼叫時也要有錯誤處理。
 
+<details>
+<summary>參考解答</summary>
+
+先寫 `delay`（沿用本章範例一，把 setTimeout 包成 Promise），再寫 `simulateSave`：
+
+```typescript
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function simulateSave(text: string): Promise<void> {
+  await delay(1200)                       // 模擬 1.2 秒網路延遲
+
+  if (text === "") {
+    throw new Error("不能儲存空內容")     // 空字串 → 丟出錯誤
+  }
+
+  console.log(`儲存成功：${text}`)
+}
+```
+
+呼叫時用 `try/catch` 包起來，因為 `simulateSave` 可能會 throw：
+
+```typescript
+async function main(): Promise<void> {
+  try {
+    await simulateSave("買牛奶")   // 正常：1.2 秒後印出「儲存成功：買牛奶」
+    await simulateSave("")         // 這行會丟錯，被下面的 catch 接住
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("儲存失敗：", error.message)   // 印出「不能儲存空內容」
+    }
+  }
+}
+
+main()
+```
+
+說明：
+
+- `await delay(1200)` 讓函式暫停 1.2 秒再往下——這是用 `setTimeout` 包 Promise 來「模擬慢速 API」，本章範例一教過的技巧。
+- 用 `throw new Error("不能儲存空內容")` 丟錯，而不是 `return`——這樣呼叫端才能用 `try/catch` 統一處理成功與失敗兩條路。錯誤訊息寫成對人有意義的句子（符合專案的錯誤處理規範）。
+- 捕捉錯誤時先用 `error instanceof Error` 判斷，因為 TypeScript 裡 `catch` 的 error 型別是 `unknown`，確認它是 `Error` 之後才能安全讀 `.message`（本章範例三也是這個寫法）。
+
+</details>
+
 **練習三**
 
 延伸練習二，在頁面上加入以下互動：
@@ -377,3 +454,56 @@ function getUserName(): Promise<string> {
 - 如果出錯（空字串），在頁面上顯示錯誤訊息
 
 （提示：這個練習需要結合 3-5 章的 `addEventListener` 和本章的 `async/await`）
+
+<details>
+<summary>參考解答</summary>
+
+HTML：
+
+```html
+<input type="text" id="saveInput" placeholder="輸入要儲存的內容" />
+<button id="saveBtn">儲存</button>
+<p id="errorMsg" style="color: red;"></p>
+```
+
+TypeScript（沿用練習二的 `delay` 與 `simulateSave`）：
+
+```typescript
+const saveInput = document.querySelector<HTMLInputElement>("#saveInput")
+const saveBtn = document.querySelector<HTMLButtonElement>("#saveBtn")
+const errorMsg = document.querySelector<HTMLParagraphElement>("#errorMsg")
+
+if (saveInput && saveBtn && errorMsg) {
+  saveBtn.addEventListener("click", async () => {
+    // 每次按下先清掉上一次的錯誤訊息
+    errorMsg.textContent = ""
+
+    // 進入「儲存中」狀態：改文字 + 停用按鈕，避免重複點擊
+    saveBtn.textContent = "儲存中..."
+    saveBtn.disabled = true
+
+    try {
+      await simulateSave(saveInput.value.trim())
+    } catch (error) {
+      if (error instanceof Error) {
+        errorMsg.textContent = error.message   // 把錯誤顯示在頁面上
+      }
+    } finally {
+      // 不論成功或失敗，都要把按鈕還原（finally 保證一定執行）
+      saveBtn.textContent = "儲存"
+      saveBtn.disabled = false
+    }
+  })
+}
+```
+
+說明：
+
+- 把事件處理函式寫成 `async () => { ... }`，這樣裡面才能用 `await simulateSave(...)`——這就是結合 3-5 章的 `addEventListener` 和本章 `async/await` 的關鍵。
+- **停用按鈕**（`saveBtn.disabled = true`）很重要：非同步儲存要花 1.2 秒，若不停用，使用者可能連點好幾下觸發多次儲存。
+- 把「還原按鈕」放在 **`finally`** 而不是 try 或 catch 裡：`finally` 不論成功或丟錯都會執行，能保證按鈕一定會恢復可用、文字一定會改回「儲存」，不會卡在「儲存中...」的狀態。這是處理載入狀態時非常實用的模式。
+- 錯誤時把 `error.message` 塞進 `errorMsg.textContent`，讓錯誤顯示在畫面上而不只是 console。
+
+**請自行實機驗證**：輸入文字按「儲存」，按鈕會短暫變成「儲存中...」且不可點，1.2 秒後恢復；清空輸入框再按，畫面下方會出現紅字「不能儲存空內容」。
+
+</details>

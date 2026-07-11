@@ -195,6 +195,49 @@ docker compose up -d --build
 
 把你 Part 4 的網站，依本章步驟改造成 Compose 版本，用 `docker compose up -d --build` 一鍵啟動，並從瀏覽器確認能連到。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手／實機題，需要在你自己的伺服器上實作驗證。照本章步驟串起整套：
+
+**1. 整理專案結構**（`/home/deploy/myapp/`）：`server.js`、`package.json`、`Dockerfile`、`.dockerignore`、`docker-compose.yml`，加上 `nginx/default.conf`。
+
+**2. `nginx/default.conf`**（反向代理到 app 容器，主機名直接寫服務名 `app`）：
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    location / {
+        proxy_pass http://app:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+**3. `docker-compose.yml`**：三個服務 nginx / app / db，只有 nginx 對外開 80、app 不開 port（躲在 nginx 後面）、三個都加 `restart: always`、db 用 volume 存資料（內容照本章範例）。
+
+**4. 一鍵啟動並驗證**：
+
+```bash
+cd /home/deploy/myapp
+docker compose up -d --build   # --build 確保先 build app image
+docker compose ps              # 三個服務都要 Up
+curl http://localhost          # 從本機測，應透過 nginx→app 拿到回應
+```
+
+**驗收點**：
+
+- `docker compose ps` 看到 `nginx`、`app`、`db` 三個都是 `Up`（running）。
+- `curl http://localhost`（主機本機、走 80）要收到你後端的回應，代表 nginx → app 這條反向代理通了。
+- **從你自己電腦的瀏覽器**連伺服器的公開 IP，也要看得到畫面——這一步需要**你親自用瀏覽器驗證**（agent 看不到畫面）。記得 Part 3-3 的防火牆要放行 80 埠，否則外部連不進來。
+- 若連不到：先 `docker compose logs -f` 看是哪個容器出錯（常見是 app 沒起來、或 nginx 設定檔路徑掛錯）。
+
+> 這是實機＋視覺驗證題，請以你自己伺服器與瀏覽器上的實際結果為準自行驗證。
+
+</details>
+
 ---
 
 ### 練習 2：驗證自動重啟
@@ -207,6 +250,32 @@ docker kill myapp-app-1     # 砍掉它（名字以你的為準）
 docker compose ps           # 過一下再看，它又起來了（restart: always）
 ```
 
+<details>
+<summary>參考解答</summary>
+
+這是動手／實機題，需要在你自己的伺服器上實際操作驗證。做法：
+
+```bash
+docker compose ps                    # 先看 app 容器真正的名字（NAME 欄）
+docker kill <你的 app 容器名>         # 例如 myapp-app-1，強制砍掉它
+docker compose ps                    # 立刻看：app 可能顯示 restarting 或短暫消失
+# 等個幾秒再看一次
+docker compose ps                    # app 又回到 Up 了
+```
+
+**為什麼會自己回來**：yml 裡 app 服務有 `restart: always`。這等於 Part 4-2 systemd 的「掛掉自動重啟」——差別是這次由 Docker（Compose）幫你顧著，容器一掛就自動拉起來。
+
+**驗收點**：
+
+- 用 `docker compose ps` 先確認 app 容器**真正的名字**（不同專案／版本命名可能不一樣，別直接照抄 `myapp-app-1`）。
+- `docker kill` 之後緊接著 `docker compose ps`，會看到 app 短暫離開（restarting / 不在 running）。
+- 隔幾秒再看，app **STATUS 回到 `Up`**，代表 `restart: always` 生效、自動重啟成功。
+- 進階驗證：重啟後再 `curl http://localhost` 應該又能正常拿到回應。
+
+> 這是實機操作，請以你自己伺服器上的實際輸出為準自行驗證。
+
+</details>
+
 ---
 
 ### 練習 3：寫下「兩種部署」的比較心得
@@ -215,6 +284,17 @@ docker compose ps           # 過一下再看，它又起來了（restart: alway
 
 1. 容器化在「換機器重現」上贏在哪？
 2. 有沒有什麼是手動部署反而比較單純的情況？（提示：只有一個極簡服務、且不常變動時）
+
+<details>
+<summary>參考解答</summary>
+
+這是開放／心得題，以下是示範答案與理由，你可依自己親手做過兩種部署的體會補充：
+
+1. **容器化在「換機器重現」上贏在哪**：整套環境（Nginx、後端、資料庫、它們的設定與版本、彼此的連線）全部被描述在 `docker-compose.yml` 和 Dockerfile 裡，是**可版控、可複製的檔案**。換一台新機器時，只要它裝了 Docker，把 `myapp/` 資料夾複製過去，跑一行 `docker compose up -d --build`，幾分鐘就把一模一樣的整套重現出來——不會漏步驟、不會因為手動打指令而出錯、每次結果都一致。對照 Part 4-5 的手動做法：要重新 SSH、`apt install` Nginx、寫 systemd、裝 Node、裝資料庫、逐一設定，可能花一兩小時還可能漏掉某步，兩台機器容易長得不一樣。核心價值就是**「可重現」**。
+
+2. **手動部署反而比較單純的情況**：當你只有**一個極簡、單一的服務**（例如就一支靜態網站或一個小 script），**不依賴資料庫等其他服務、也不常變動**時，手動裝一裝可能反而快——因為導入 Docker 本身有學習與維護成本（要寫 Dockerfile、compose、理解 image/volume/network、機器上還要裝 Docker）。當「要協調的東西很少、環境很固定」，這些額外成本就不划算。**判斷原則**：服務越多、相依越複雜、越常換機器／常改版，容器化的「可重現」價值越高；反之越單純、越靜態，手動的簡單就越有優勢。這也呼應課程一貫的「過早最佳化」提醒——沒有痛點時，別為了用而用。
+
+</details>
 
 > 提示：容器化解決了「可重現」，但「複製檔案 + 跑指令」這件事本身還是手動的。下一個 Part 6（Ansible）就要把「連複製和執行都自動化」——讓你對著一台全新機器，一鍵裝好 Docker、拉好程式碼、啟動整套。
 

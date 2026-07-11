@@ -236,6 +236,48 @@ git push
 6. 在 GitHub 上的 README.md 區域，點擊「Add a README」，GitHub 會直接讓你在網頁上編輯
 7. 回到終端機，執行 `git pull`，看看本機有沒有同步到你剛才在網頁上加的 README
 
+<details>
+<summary>參考解答</summary>
+
+這題整套都是實機操作，下面給正確指令與各步驟的驗收檢查點，**最終仍需自行在自己的 GitHub 與終端機上驗證。**
+
+**步驟 1～4：建倉庫並推上去**
+
+先在 GitHub 網頁上建立一個 public 倉庫，命名 `git-practice`，**不要**勾選「Add a README file」（本機已經有內容，避免衝突）。接著在終端機：
+
+```bash
+cd ~/Desktop/git-practice          # 進入 0-5 練習的資料夾
+git remote add origin https://github.com/你的帳號/git-practice.git
+git push -u origin main
+```
+
+- 把 `你的帳號` 換成你自己的 GitHub 帳號名稱。
+- 第一次 `push` 加 `-u` 是設定預設上游，之後只要打 `git push` 就好。
+- 過程中若被要求登入，現在 GitHub 不接受帳號密碼，要用 **Personal Access Token（PAT）** 當密碼；或事先設定好 SSH 金鑰。
+- 若出現 `remote origin already exists`，代表你之前加過了，可用 `git remote set-url origin <網址>` 改掉，或先 `git remote remove origin` 再重加。
+
+**步驟 5：確認 commit 都在**
+
+打開 GitHub 網頁重新整理，倉庫首頁應該看得到你的檔案，點進 commit 歷史應該看得到 0-5 建立的那三個 commit。
+
+- **驗收檢查點**：GitHub 上的 commit 數與訊息，和你本機 `git log --oneline` 看到的一致。
+
+**步驟 6：在網頁上新增 README**
+
+在倉庫頁面點「Add a README」，GitHub 會直接給你一個線上編輯器。隨便寫幾行（例如專案說明），拉到最下面點「Commit changes」。這一步等於**直接在遠端倉庫建立了一個新 commit**，而這個 commit 你本機還沒有。
+
+**步驟 7：把遠端的新 commit 拉回本機**
+
+```bash
+git pull
+```
+
+- **驗收檢查點**：`git pull` 執行後，你的 `git-practice` 資料夾裡會多出剛才在網頁上建立的 `README.md`，`git log` 也會看到那個「在網頁上建立 README」的 commit。這證明本機已經跟遠端同步了。
+
+這整個練習體會的重點：本機倉庫和 GitHub 遠端倉庫是**兩個獨立的地方**，`push` 把本機的 commit 送上去、`pull` 把遠端的 commit 拉下來，兩邊靠這兩個指令保持同步。
+
+</details>
+
 ## 課外讀物
 
 > 想了解 Git 分支策略與團隊協作流程 → [課外讀物 E-8-7：Git Flow 與 GitHub Flow](../../../課外讀物/E-8-git/E-8-7-git-flow.md)

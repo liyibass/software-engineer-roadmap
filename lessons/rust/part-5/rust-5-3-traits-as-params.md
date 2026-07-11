@@ -111,6 +111,63 @@ graph TB
 2. 寫一個函式 `fn random_shape(big: bool) -> Box<dyn Shape>`，`big` 為真回傳大圓、否則回傳小矩形。在 `main` 呼叫並印出面積。
 3. 思考題：什麼情況你「必須」用 `Box<dyn Trait>` 而不能用 `impl Trait`？（提示：和「一個容器要裝不同具體型別」有關。）
 
+<details>
+<summary>參考解答</summary>
+
+以下沿用 [rust-5-2] 的 `Shape` trait（`Circle`、`Rectangle` 都實作了 `area`）。
+
+**第 1 題：`impl` 參數版接受單一形狀並印出面積**
+
+`shape: impl Shape` 讀作「某個有實作 `Shape` 的型別」，比 `<T: Shape>` 更短：
+
+```rust
+fn total_area(shape: impl Shape) {
+    println!("面積是 {}", shape.area());
+}
+
+fn main() {
+    total_area(Circle { radius: 2.0 });
+    total_area(Rectangle { width: 3.0, height: 4.0 });
+}
+```
+
+**第 2 題：`random_shape` 用 `Box<dyn Shape>` 回傳不同型別**
+
+因為兩個分支回傳的具體型別不同（`Circle` vs `Rectangle`），不能用 `impl Shape`（那要求所有分支回傳同一型別），必須用 `Box<dyn Shape>`。記得用 `Box::new(...)` 把值裝進 `Box`：
+
+```rust
+fn random_shape(big: bool) -> Box<dyn Shape> {
+    if big {
+        Box::new(Circle { radius: 10.0 })          // 大圓
+    } else {
+        Box::new(Rectangle { width: 1.0, height: 2.0 }) // 小矩形
+    }
+}
+
+fn main() {
+    let shape = random_shape(true);
+    println!("面積是 {}", shape.area());   // 呼叫時才動態查是圓還是矩形
+}
+```
+
+**第 3 題：什麼情況「必須」用 `Box<dyn Trait>`？**
+
+當「具體型別要到執行時才決定」，或「要把不同具體型別放進同一個地方」時。最典型的例子是**一個容器要裝不同具體型別**，例如「一個 `Vec` 裡同時放圓形和矩形」：
+
+```rust
+let shapes: Vec<Box<dyn Shape>> = vec![
+    Box::new(Circle { radius: 1.0 }),
+    Box::new(Rectangle { width: 2.0, height: 3.0 }),
+];
+for s in &shapes {
+    println!("{}", s.area());
+}
+```
+
+`Vec<T>` 的每個元素必須是同一型別 `T`。若寫 `Vec<impl Shape>`，那個型別在編譯期就被鎖成單一種（例如全是 `Circle`），塞不進 `Rectangle`。而 `Box<dyn Shape>` 是「指向某個 `Shape` 的指標，具體是誰執行時才知道」，大小固定、型別統一，所以圓和矩形可以並存在同一個 `Vec` 裡。這種「混裝不同型別」的需求，就是 `impl Trait` 做不到、非得動態派發的場合。
+
+</details>
+
 ## 課外讀物
 
 > 「依賴能力（trait）而非具體型別」是依賴反轉原則 → [課外讀物 E-7-6：依賴反轉原則](../../../課外讀物/E-7-solid/E-7-6-dip.md)

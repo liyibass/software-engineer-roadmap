@@ -210,11 +210,72 @@ myserver : ok=8  changed=0  unreachable=0  failed=0
 
 把這份 playbook 寫好，對你的 EC2 執行成功（`failed=0`）。然後從瀏覽器連伺服器 IP，確認 Nginx 起來了。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，要對你的 EC2 實機執行、並用瀏覽器驗證。步驟如下：
+
+**第一步：把檔案準備齊全**（照本章的專案結構）
+
+```
+infra-practice/
+├── inventory.ini      ← Part 6-4 建好的
+├── site.yml           ← 本章的主 playbook
+└── files/
+    └── myapp.conf     ← Nginx 反向代理設定
+```
+
+`files/myapp.conf` 和 `site.yml` 的內容直接照本章「程式碼範例」抄好。
+
+**第二步：執行 playbook**
+
+```bash
+cd ~/infra-practice
+ansible-playbook -i inventory.ini site.yml
+```
+
+**驗收點 1**：看最後的 PLAY RECAP，確認 **`failed=0`**，例如：
+
+```
+myserver : ok=8  changed=6  unreachable=0  failed=0
+```
+
+`failed=0` 代表每個 task 都成功了。如果有 `failed`，看它卡在哪個 task 的紅字錯誤訊息去對症下藥（常見是 SSH 不通、或 sudo 權限問題——確認 `become: yes` 有加、deploy 使用者能免密碼 sudo）。
+
+**驗收點 2**：打開瀏覽器，連 `http://你的EC2-IP`。因為這份 playbook 只裝了 Nginx、還沒有真的跑一個 listen 在 3000 埠的後端，Nginx 反向代理過去會拿到 502 Bad Gateway——這是**正常的**，看到 502（而不是連不上、逾時）就代表 Nginx 本身已經起來、防火牆的 80 埠也放行了，只是後端還沒接上。想看到完整頁面，可以先在伺服器上跑一個監聽 3000 埠的服務（例如 Part 5 的容器）再連。
+
+（若你的安全群組 Security Group 沒開 80 埠，瀏覽器會連不上——記得 AWS 那層的防火牆也要放行 80。）
+
+</details>
+
 ---
 
 ### 練習 2：親手驗證冪等性
 
 連續跑兩次同一個 playbook，比較兩次的 PLAY RECAP。第二次的 `changed` 是多少？用自己的話解釋為什麼。
+
+<details>
+<summary>參考解答</summary>
+
+把同一個 playbook 連跑兩次：
+
+```bash
+ansible-playbook -i inventory.ini site.yml
+ansible-playbook -i inventory.ini site.yml
+```
+
+**觀察到的結果**：
+
+- 第一次：`ok=8  changed=6`（各項設定原本都還沒到位，Ansible 一項項幫你做出改動）。
+- 第二次：`ok=8  changed=0`（沒有任何改動）。
+
+**第二次的 `changed` 是 `0`**。
+
+**為什麼**：因為 Ansible 是**冪等**的。它每個 task 描述的是「期望的狀態」（nginx 要 present、服務要 started、防火牆要放行某些埠……），執行時會**先檢查現況**：第一次跑時這些狀態都還沒達成，所以它動手去做，顯示 `changed`；第二次跑時，所有東西**都已經是目標狀態了**，Ansible 一檢查發現「不用做任何事」，就全部跳過，於是 `changed=0`、全都是 `ok`。
+
+這正是冪等性的價值——你可以放心地一跑再跑，Ansible 只會處理「還沒達標」的部分，已經對的就不碰，不會因為重跑而把東西弄壞或重裝一遍。
+
+</details>
 
 ---
 
@@ -226,6 +287,48 @@ myserver : ok=8  changed=0  unreachable=0  failed=0
 2. 是不是只有新增的那個 task 顯示 `changed`，其他都是 `ok`？
 
 > 提示：這證明了你能安全地「逐步演進」一台機器的設定，而不用擔心重跑會破壞已有的東西。把這份 playbook 放進 Git，你就擁有了一份可追溯、可重現的基礎設施定義——這是 Part 8 災難復原、Part 9 多機管理的基礎。
+
+<details>
+<summary>參考解答</summary>
+
+在 `site.yml` 的 `tasks:` 底下，任一處加一個新的 task（習慣上放在安裝套件那一區附近）：
+
+```yaml
+    - name: 安裝 htop
+      apt:
+        name: htop
+        state: present
+```
+
+也可以直接把 `htop` 併進原本那個「安裝 nginx 與防火牆工具」的清單裡：
+
+```yaml
+    - name: 安裝 nginx 與防火牆工具
+      apt:
+        name:
+          - nginx
+          - ufw
+          - htop
+        state: present
+```
+
+兩種寫法都對。存檔後重跑：
+
+```bash
+ansible-playbook -i inventory.ini site.yml
+```
+
+**回答兩個觀察點**：
+
+1. **PLAY RECAP 的 `changed` 是多少**：`changed=1`。因為只有「安裝 htop」這件事是新的、還沒達標，Ansible 只做了這一項改動。（若你是併進原本清單的寫法，那個 `apt` task 會顯示 `changed`，因為清單裡多了一個還沒裝的套件。）
+
+2. **是不是只有新增的 task 顯示 `changed`、其他都是 `ok`**：是的。其他 task（nginx、ufw、防火牆規則、設定檔、服務）之前都已經達到目標狀態了，這次重跑 Ansible 一檢查發現不用動，全部顯示 `ok`。只有新加的 htop 是 `changed`。
+
+**這證明了什麼**：你能安全地「逐步演進」一台機器的設定——想加東西就改 playbook、重跑，Ansible 只套用「有變的那一項」，完全不會動到、也不會弄壞已經設好的其他部分。把這份 playbook 放進 Git，它就是一份可追溯、可重現的基礎設施定義。
+
+（驗收：可自行 `ssh` 進 EC2 打 `htop` 確認真的裝好了。）
+
+</details>
 
 ## 課外讀物
 

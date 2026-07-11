@@ -100,6 +100,54 @@ fn main() {
 2. 寫一個泛型 struct `Pair<T>`，有兩個同型別欄位 `first`、`second`，建立一個整數版和一個字串版。
 3. 思考題：`larger` 函式如果不加 `T: PartialOrd` 限制，為什麼會編譯失敗？（提示：編譯器怎麼知道任意的 `T` 能不能用 `>` 比較？）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：泛型函式 `first`**
+
+要回傳 tuple 的第一個元素。用 `pair.0` 把它「拿出來」——因為 `pair` 是傳值進來（函式取得了 tuple 的所有權），所以直接把 `.0` 搬出來回傳就好，不需要 `Clone`，也不需要 `PartialOrd`（我們沒有比較大小）：
+
+```rust
+fn first<T>(pair: (T, T)) -> T {
+    pair.0
+}
+
+fn main() {
+    println!("{}", first((10, 20)));           // 10
+    println!("{}", first(("hello", "world"))); // hello
+}
+```
+
+小提醒：這裡不需要任何 trait bound，因為「回傳一個值」對任何型別都成立。只有當你要「對 `T` 做某件事」（比較、印出、複製…）時，才需要對應的 trait 限制。
+
+**第 2 題：泛型 struct `Pair<T>`**
+
+兩個欄位同型別，所以共用一個 `T`：
+
+```rust
+struct Pair<T> {
+    first: T,
+    second: T,
+}
+
+fn main() {
+    let int_pair = Pair { first: 1, second: 2 };              // T = i32
+    let str_pair = Pair { first: String::from("a"), second: String::from("b") }; // T = String
+    println!("{} {}", int_pair.first, int_pair.second);
+    println!("{} {}", str_pair.first, str_pair.second);
+}
+```
+
+注意兩個欄位是「同一個 `T`」，所以 `Pair { first: 1, second: "x" }` 會編譯失敗（一個 `i32`、一個 `&str` 不一致）。如果你想要兩欄位可以不同型別，就得寫成 `Pair<T, U>` 兩個型別參數。
+
+**第 3 題：為什麼不加 `T: PartialOrd` 會編譯失敗？**
+
+因為泛型的 `T` 代表「任何型別」，而不是所有型別都能用 `>` 比較大小（例如兩個函式、兩個沒定義順序的自訂 struct，比大小根本沒意義）。編譯器在編譯 `larger` 這份泛型模板時，並不知道你未來會傳什麼型別進來，所以它**必須在函式簽名就看到保證**：「`T` 一定具備『能比較大小』這個能力」。
+
+`T: PartialOrd` 就是這個保證——它告訴編譯器「只准傳有實作 `PartialOrd` 的型別」。少了它，編譯器面對 `a > b` 只能說「我無法確定任意的 `T` 支不支援 `>`」而拒絕編譯。這正是 Rust 的哲學：能力要在編譯期就講清楚，而不是等到執行時才爆炸。
+
+</details>
+
 ## 課外讀物
 
 > 「不要重複自己（DRY）」是重要的程式設計原則 → [課外讀物 E-6-1：什麼是 Clean Code](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)

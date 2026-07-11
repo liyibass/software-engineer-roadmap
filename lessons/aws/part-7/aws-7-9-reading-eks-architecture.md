@@ -140,17 +140,62 @@ graph TB
 
 回答：EKS 不是獨立的——它怎麼和 VPC、ALB、RDS、ECR、IAM 整合？（各舉它和其中之一的關係）
 
+<details>
+<summary>參考解答</summary>
+
+EKS 是「把容器跑起來的平台」，但它**住在 VPC 裡**，周圍的網路、入口、資料、image、權限全都靠你前面 Part 學的服務。逐一舉例：
+
+- **VPC**：EKS 的 Node / Pod 跑在 VPC 的**私有子網路**（aws-4-3），而且 **Pod 的 IP 直接來自 VPC**（aws-7-6 的 VPC CNI）——Pod 是 VPC 裡的一等公民。
+- **ALB**：EKS 的 **Ingress 背後常常就是用 ALB 實現**（aws-6-4、7-6），對外的流量入口、依路徑分流由 ALB 擔任。
+- **RDS**：Pod 需要資料時，**連 RDS**（aws-6-2，跑在私有子網路的託管資料庫）。
+- **ECR**：Node 跑容器時，**從 ECR 拉 image**（aws-7-2）。
+- **IAM**：Pod 用 **IAM Role**（aws-2-1）來取得存取其他 AWS 服務（如 S3、RDS）的權限，不用塞金鑰。
+- **跨 AZ**：Node 分散在多個 AZ 的子網路（aws-4-7），達成高可用。
+
+一句話：**EKS 把 VPC（網路）、ALB（入口）、RDS（資料）、ECR（image）、IAM（權限）這些你前面學的積木黏在一起**，自己專注在「把容器調度、跑起來、維持狀態」。
+
+</details>
+
 ---
 
 ### 練習 2：追一個請求
 
 不看上面，描述「使用者下單」的請求，從 Route 53 一路到 RDS 的旅程（經過哪些元件）。
 
+<details>
+<summary>參考解答</summary>
+
+以「使用者連 `https://shop.com/api/orders` 下單」為例，由外而內的旅程：
+
+1. **Route 53（aws-6-6）**：解析網域 `shop.com`，把使用者導向 CloudFront。
+2. **CloudFront（aws-6-5，CDN）**：動態的 API 請求不適合快取，轉給來源的 **ALB**。
+3. **ALB（公開子網路，aws-6-4）**：作為 EKS 的 **Ingress**，依規則 `/api/*` 把請求路由到對應的 Service。
+4. **Service「order-service」（aws-7-6）**：用內部負載平衡 + CoreDNS，挑一個健康的 order **Pod**。
+5. **order Pod（跑在私有子網路的 Node 上）**：處理下單邏輯——用 **IAM Role**（aws-2-1）取得權限，先查 **ElastiCache**（aws-6-3）看快取，再寫入 **RDS**（aws-6-2，私有子網路的資料庫）。
+6. **回應沿原路回去**：Pod → Service → ALB/Ingress → CloudFront → 使用者。
+
+一句話串起來：**使用者 → Route 53 → CloudFront → ALB(Ingress) → Service → Pod → ElastiCache / RDS**，再原路返回。
+
+</details>
+
 ---
 
 ### 練習 3：讀懂自動化
 
 在這個架構裡，當「流量暴增」「某個 Pod 掛了」「某個 AZ 掛了」時，分別是哪些機制自動應對？（對應你 Part 4~7 學的）
+
+<details>
+<summary>參考解答</summary>
+
+三種狀況，分別由不同機制自動應對：
+
+- **流量暴增** → **HPA（aws-7-7）** 偵測到 Pod CPU 升高，自動多開 order Pod 來分攤；如果現有 Node 資源不夠、Pod 排不進去，**Cluster Autoscaler（aws-7-7）** 再自動加 Node（EC2）。（若用 Fargate，則不需要 Cluster Autoscaler，AWS 直接幫每個 Pod 準備運算。）流量退去後兩者再自動縮回、省錢。
+- **某個 Pod 掛了** → EKS 的 **Control Plane 裡的 Controller（aws-7-5）** 依「期望狀態」自動重建一個新 Pod（新 IP）；**Service（aws-7-6）** 自動更新、把流量導到新 Pod。因為 Service 的穩定位址沒變，**使用者無感**（呼應 aws-7-4 體驗的自我修復）。
+- **某個 AZ 掛了** → 因為 Node 跨多個 AZ 分散（aws-4-7）、RDS 有跨 AZ 的備援副本（aws-6-2），**其他 AZ 的 Node 和 RDS 副本頂上**，服務持續運作。
+
+整體來看，這些「聲明目標、系統自己維持」的自動化（自我修復 + 自動擴縮 + 跨 AZ 高可用），正是你 Part 4~7 一路學來的東西在同一張架構圖上一起運作。
+
+</details>
 
 ## 課外讀物
 

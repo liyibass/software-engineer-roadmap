@@ -134,6 +134,119 @@ graph TB
 2. 用一個 `List<Shape>` 裝不同形狀，用 `foreach` 呼叫 `Area()`，觀察多型自動執行各自版本。
 3. 思考題：「狗 is-a 動物」適合繼承。那「汽車 has-a 引擎」呢？該用繼承還是組合？為什麼？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：`Shape` 父類別 + `Circle`、`Rectangle` 覆寫 `Area()`**
+
+父類別用 `virtual` 宣告「這個方法可被覆寫」，子類別用 `override` 提供各自的面積算法：
+
+```csharp
+class Shape
+{
+    // virtual：允許子類別覆寫。父類別沒有具體形狀，先回傳 0 當預設
+    public virtual double Area()
+    {
+        return 0;
+    }
+}
+
+class Circle : Shape
+{
+    public double Radius { get; }
+
+    public Circle(double radius)
+    {
+        Radius = radius;
+    }
+
+    public override double Area()
+    {
+        return Math.PI * Radius * Radius;    // 圓面積 = πr²
+    }
+}
+
+class Rectangle : Shape
+{
+    public double Width { get; }
+    public double Height { get; }
+
+    public Rectangle(double width, double height)
+    {
+        Width = width;
+        Height = height;
+    }
+
+    public override double Area()
+    {
+        return Width * Height;               // 矩形面積 = 寬 × 高
+    }
+}
+```
+
+> 小提醒：因為 `Shape` 本身沒有「真正的形狀」，其實更適合寫成 `abstract class Shape` 搭配 `abstract double Area()`，強制子類別一定要實作——這是下一章 [csharp-2-4] 的主題。這裡先用 `virtual` 讓它可以獨立跑。
+
+**第 2 題：用 `List<Shape>` 裝不同形狀，`foreach` 呼叫 `Area()`**
+
+把不同子類別都當成 `Shape` 裝進同一個 List，迴圈裡只寫 `shape.Area()`，C# 會自動依「物件實際是什麼」執行對應版本——這就是多型：
+
+```csharp
+List<Shape> shapes = new List<Shape>
+{
+    new Circle(5),
+    new Rectangle(3, 4),
+    new Circle(1),
+};
+
+foreach (Shape shape in shapes)
+{
+    Console.WriteLine($"面積 = {shape.Area():F2}");
+}
+// 面積 = 78.54   （圓，半徑 5）
+// 面積 = 12.00   （矩形 3×4）
+// 面積 = 3.14    （圓，半徑 1）
+```
+
+關鍵：迴圈完全沒有 `if (是圓形) ... else if (是矩形) ...`。未來新增 `Triangle : Shape`，這段迴圈一個字都不用改——這就是「對擴充開放、對修改封閉」→ **[課外讀物 E-7-3] O — 開放封閉原則**。
+
+**第 3 題（思考題）：「汽車 has-a 引擎」該用繼承還是組合？**
+
+**該用組合，不是繼承。**
+
+判斷法則是看關係是「is-a（是一種）」還是「has-a（有一個）」：
+
+- 「狗 **是一種** 動物」→ is-a → 適合繼承。
+- 「汽車 **有一個** 引擎」→ has-a → 汽車不是一種引擎，而是「持有」引擎，所以用組合（把引擎當成汽車的一個欄位）。
+
+```csharp
+class Engine
+{
+    public int Horsepower { get; }
+    public Engine(int horsepower) => Horsepower = horsepower;
+    public void Start() => Console.WriteLine("引擎發動");
+}
+
+class Car
+{
+    private readonly Engine _engine;    // 組合：Car「持有」一個 Engine
+
+    public Car(Engine engine)
+    {
+        _engine = engine;
+    }
+
+    public void Drive()
+    {
+        _engine.Start();                // 委派給持有的引擎
+        Console.WriteLine("汽車前進");
+    }
+}
+```
+
+如果硬讓 `Car : Engine`（汽車繼承引擎），語意就錯了——汽車不是引擎；而且之後汽車還「有」輪子、座椅，總不能全部都繼承。組合更貼近真實世界，也更有彈性（可以換不同引擎）。這正是本章講的「組合優於繼承」。
+
+</details>
+
 ## 課外讀物
 
 > 多型 → 對擴充開放、對修改封閉 → [課外讀物 E-7-3：開放封閉原則](../../../課外讀物/E-7-solid/E-7-3-ocp.md)

@@ -204,6 +204,38 @@ V4 架構：
 
 **練習 3**：用自己的話解釋：為什麼 CORS 要設定在「後端」而不是「前端」？如果前端能自己決定「我要跨來源」，同源政策還有意義嗎？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1（動手題，需自行實機驗證）**
+
+做法：前端 `npm run dev`（跑在 5173）、後端 `npm run dev`（跑在 3000），確認前端能正常讀取／新增待辦。打開瀏覽器 DevTools → Network 頁籤 → 點 `/todos` 這筆請求 → 看 Response Headers。
+
+驗收點：你應該會在 Response Headers 裡看到一行 `Access-Control-Allow-Origin: http://localhost:5173`（因為後端 `cors({ origin: ... })` 設定的來源）。這行就是後端在對瀏覽器說「我允許 5173 來訪問」，瀏覽器看到它才放行。看不到這行、或值對不上，瀏覽器就會擋下。這題要在瀏覽器裡實際看，請自行實機驗證。
+
+**練習 2（動手題，需自行實機驗證）**
+
+做法：把後端改成 `cors({ origin: "http://localhost:9999" })`，重啟後端，重新整理前端。
+
+驗收點：Console 會跳出類似這行紅字：
+
+```
+Access to fetch at 'http://localhost:3000/todos' from origin
+'http://localhost:5173' has been blocked by CORS policy:
+The 'Access-Control-Allow-Origin' header has a value 'http://localhost:9999'
+that is not equal to the supplied origin.
+```
+
+讀懂它：後端回的允許來源是 `9999`，但實際發請求的前端是 `5173`，兩者對不上，所以瀏覽器擋下。這正說明「後端允許的來源」必須跟「前端真正的來源」一致才會放行。看完把來源改回 `5173` 即可。請自行實機驗證。
+
+**練習 3**
+
+因為 CORS 的本質是「**被訪問的一方決定要不要開門**」，而不是「想訪問的一方自己決定能不能進」。如果讓前端自己說「我要跨來源」就能通過，那同源政策就形同虛設了——因為惡意網站 `evil.com` 的 JavaScript 也會毫不猶豫地宣稱「我要跨來源打 bank.com」，防線瞬間崩潰。
+
+同源政策的價值，正是建立在「跨來源要不要放行，由**被請求的後端**說了算」這個前提上：`bank.com` 沒有在回應裡加上「我允許 evil.com」的標頭，瀏覽器就擋下 evil.com 的請求；而你自己的後端明確加上「我允許 5173」，瀏覽器才放行你的前端。決定權握在被訪問方手裡，攻擊者控制的前端無法自己繞過——這才是這套機制有意義的原因。
+
+</details>
+
 ---
 
 ## 課外讀物

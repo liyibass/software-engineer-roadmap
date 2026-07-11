@@ -125,17 +125,92 @@ Serverless（這章）：
 
 照步驟做一個 Lambda + API Gateway 的 API，用 curl 或瀏覽器呼叫成功。改一下回傳內容，重新測試。
 
+<details>
+<summary>參考解答</summary>
+
+> ⚠️ 這是動手題，請自行在 AWS Console 實機操作驗證，這裡只給做法與驗收點。（做完記得依本章「清理」段落刪掉 Lambda 與 API Gateway。）
+
+**做法**
+
+1. **建 Lambda**：Console → Lambda → Create function → Author from scratch，Function name 填 `hello-api`，Runtime 選 Node.js（或你熟的），建立。
+2. **貼程式碼**：把本章的 handler 貼進去，記得 **Deploy**（HTTP API 建好後改程式碼一定要按 Deploy 才會生效）。
+3. **加觸發器**：函式頁 → Add trigger → 選 API Gateway → Create a new API → HTTP API → Security 選 Open → 建立。它會給你一個網址端點。
+4. **呼叫測試**：
+
+   ```bash
+   curl "https://xxxx.execute-api.../hello-api?name=小明"
+   ```
+
+   應該收到 `{"message":"你好，小明！這是無伺服器 API。"}`。不帶 `name` 參數則會回「你好，世界！」（因為程式碼用了 `|| "世界"` 當預設值）。
+
+5. **改回傳內容重測**：例如把訊息改成 `你好，${name}！今天是個好日子。`，記得再按一次 **Deploy**，然後重新 curl 一次確認變了。
+
+**驗收點**
+
+- curl / 瀏覽器打那個網址，能拿到 200 與 JSON 回應。
+- 帶 `?name=某某` 時，回傳訊息裡出現你傳的名字；不帶時是預設值。
+- 改完程式碼並 Deploy 後，重新呼叫看得到新內容。
+
+**常見卡點**：改了程式碼卻沒按 Deploy（還是舊回應）；或忘了在網址後面加 `/hello-api` 這段路徑。
+
+</details>
+
 ---
 
 ### 練習 2：對比傳統
 
 回答：這個 serverless API，和 basic Part 4 用 Express 在 EC2 上跑的 API，在「你要管的東西」上有什麼根本差別？
 
+<details>
+<summary>參考解答</summary>
+
+根本差別就是「**你要管的東西差非常多**」——serverless 幾乎只剩業務邏輯要管。
+
+**傳統做法（basic Part 4 / aws-3-2，Express + EC2）你要管**：
+
+- 開一台 EC2、SSH 進去、裝 Node.js。
+- 寫 Express（含 `app.listen` 啟動伺服器、監聽 port）。
+- 設定 Nginx、設定 Security Group。
+- 機器要**一直開著**（就算沒人用也在計費）。
+- 流量大了，得**自己想辦法擴展**（加機器、設負載平衡…）。
+
+**Serverless 做法（本章，API Gateway + Lambda）你只要管**：
+
+- 寫一個 handler 函式（收到請求要做什麼）。
+- 接上 API Gateway。
+- 完成。
+
+其餘——機器、OS、啟動伺服器、擴縮——**全部 AWS 處理**。而且沒有一直開的機器，所以閒置零成本；一個人呼叫或一萬人同時呼叫，AWS 自動起對應數量的 Lambda 實例應付。
+
+一句話：傳統做法你要同時顧「業務邏輯 + 一整套基礎設施」；serverless 讓你**只專注業務邏輯，基建完全不用碰**。這就是它的魅力。
+
+</details>
+
 ---
 
 ### 練習 3：思考適用
 
 回答：你的 Lambda 函式裡，為什麼沒有 `app.listen`（啟動伺服器）這種程式碼？這個「無伺服器 API」適合什麼樣的流量場景？（提示：aws-8-1 的計費、冷啟動）
+
+<details>
+<summary>參考解答</summary>
+
+**為什麼沒有 `app.listen`**
+
+因為**根本沒有一台由你啟動、持續監聽 port 的伺服器**。`app.listen` 的作用是「啟動一個伺服器行程，讓它一直開著、監聽某個 port、等請求進來」——這是「伺服器一直在跑」的模型。
+
+Lambda 是**事件驅動**的：平常不存在、不佔資源，有請求（事件）進來時 AWS 才「瞬間起一個實例」呼叫你的 handler，跑完就結束。是 AWS（透過 API Gateway）在幫你「接住 HTTP 請求」，再把請求資訊塞進 `event` 丟給你的函式。所以你只需要寫「**收到請求要做什麼**」，完全不需要、也不該寫「啟動伺服器、監聽 port」的程式碼。
+
+**適合什麼流量場景**
+
+適合「**流量小、不定、突發性、有時閒**」的場景。原因對照 aws-8-1：
+
+- **計費面**：Lambda 閒置零成本、按次計費，還有每月百萬次免費額度。所以流量小或半夜沒人用時，幾乎不花錢——非常划算。反之若是「持續高頻、超大流量」，一直被觸發累加下來可能比一台一直開的 EC2 還貴，就不划算。
+- **冷啟動面**：如果是「偶爾才被呼叫」的 API，可能會撞上冷啟動、第一次呼叫慢一下。對一般輕量 API 通常可以接受；但如果是「延遲超敏感、不能忍受偶爾慢一下」的服務，就要考慮緩解手段或改用別的運算選項。
+
+所以這種無伺服器 API 最適合：輕量 API、內部工具、流量不定的服務、原型驗證這類場景。
+
+</details>
 
 ## 課外讀物
 

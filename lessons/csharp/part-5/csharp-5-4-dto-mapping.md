@@ -106,6 +106,53 @@ UserDto dto = _mapper.Map<UserDto>(user);   // 自動把對應欄位填好
 2. 寫一個 Action，把 `Product` 實體手動映射成 `ProductDto` 回傳，確認成本與內部備註沒被洩漏。
 3. 思考題：為什麼「直接把資料庫的 User 實體當 API 回應」是危險的？舉一個可能洩漏的欄位。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：`Product` 實體有 `CostPrice`（成本）和 `SupplierNotes`（內部備註）這兩個**不該對外**的欄位。對外的 `ProductDto` 只挑該公開的：`Id`、`Name`、`Price`。
+
+```csharp
+// 內部實體（含不該外洩的欄位）
+public class Product
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public decimal Price { get; set; }
+    public decimal CostPrice { get; set; }      // 成本，內部用，不對外
+    public string SupplierNotes { get; set; } = "";  // 供應商備註，內部用
+}
+
+// 對外的 DTO：只含該公開的欄位（用 record 很簡潔）
+public record ProductDto(int Id, string Name, decimal Price);
+```
+
+`ProductDto` 裡**根本沒有** `CostPrice` 和 `SupplierNotes` 的位置——從型別層面就杜絕了洩漏的可能。
+
+**第 2 題**：在 Action 裡手動把 `Product` 映射成 `ProductDto`，映射時只挑該對外的三個欄位，成本與備註自然不會被帶出去。
+
+```csharp
+[HttpGet("{id}")]
+public IActionResult GetById(int id)
+{
+    Product product = _service.GetProduct(id);   // 拿到內部實體
+    if (product == null)
+        return NotFound();
+
+    // 映射：只挑 Id/Name/Price，CostPrice 與 SupplierNotes 排除在外
+    var dto = new ProductDto(product.Id, product.Name, product.Price);
+
+    return Ok(dto);   // 回傳的 JSON 只有 id/name/price，成本與備註安全
+}
+```
+
+驗收點：呼叫這個端點，回傳的 JSON 只會有 `id`、`name`、`price` 三個欄位，看不到 `costPrice` 和 `supplierNotes`。**可自行實機在 Swagger 確認回應 body。**
+
+**第 3 題（思考題）**：危險的核心原因是——**資料庫實體通常含有「內部/敏感欄位」，直接序列化成 JSON 回應會把它們一起洩漏出去**。最典型的例子是 `User` 實體的 `PasswordHash`（密碼雜湊）欄位：一旦把整個 `User` 當 API 回應丟出去，密碼雜湊就暴露給客戶端了，攻擊者可以拿去做離線破解。其他可能洩漏的欄位還有內部備註（`InternalNotes`）、軟刪除旗標、內部信用評分等。
+
+除了資安，還有**耦合**問題：API 的形狀被綁死在資料庫結構上，之後資料庫欄位一改，API 回應就跟著變、破壞既有客戶端。用 DTO 明確挑選「只對外該給的欄位」，等於在「內部模型」和「對外介面」之間立一道閘門，資安和解耦一次解決。
+
+</details>
+
 ## 課外讀物
 
 > 別洩漏敏感資料、密碼儲存 → [課外讀物 E-10：Web Security](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)、**cs 課程 Part 9-3**

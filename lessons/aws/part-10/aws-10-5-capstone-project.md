@@ -158,11 +158,67 @@ graph LR
 
 把一個 app（你的專案或範例）完整部署上 AWS，盡量配齊：VPC、ECS、RDS、ALB、CloudFront、網域、監控、預算。用 IaC（Terraform）管理。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，沒有標準答案，這裡給你**做法（解題大綱）+ 驗收點**。實際要**自行在 AWS 實機部署驗證**——但請隨時留意成本、用完立刻 `terraform destroy`，別讓資源忘了關而爆帳（aws-10-3）。
+
+**建議步驟（照這章「部署流程」走）**：
+1. **用 Terraform 建基礎設施（9-3）**：VPC + 公開/私有子網路（跨 AZ）+ IGW/NAT（Part 4）、RDS Multi-AZ（6-2）、ElastiCache（6-3）、ECS cluster + ALB（6-4/7-4）、IAM Role 最小權限（Part 2）。`terraform plan` 先預覽再 apply。
+2. **容器化並推上 ECR（7-2）**：寫 Dockerfile（infra Part 5）→ build → push。
+3. **部署到 ECS Fargate（7-4）**：ECS service 跨 AZ 跑容器、掛到 ALB、設自動擴縮（3-4）。
+4. **入口與網域**：ACM 憑證（6-6）→ CloudFront（6-5）→ Route 53 指向（6-6），讓 `https://你的網域` 上線。
+5. **CI/CD（9-1）**：GitHub Actions：push → 測試 → build → 推 ECR → 部署 ECS。
+6. **觀測與成本（Part 10）**：CloudWatch 儀表板（依黃金訊號）+ 告警、Budgets 預算警示。
+
+**驗收點（怎麼算做到）**：
+- [ ] `https://你的網域` 能開，且是有效 HTTPS 憑證（不是自簽警告）。
+- [ ] app 能正常讀寫 RDS、命中 ElastiCache 快取。
+- [ ] ECS 服務跨兩個 AZ、關掉一個 task 仍能服務（高可用）。
+- [ ] `git push` 後 CI/CD 自動把新版本部署上線。
+- [ ] CloudWatch 看得到 ALB/ECS/RDS 的指標，告警設定生效。
+- [ ] Budgets 已設好預算與警示。
+- [ ] 整套用 `terraform apply` 能重建、`terraform destroy` 能清乾淨。
+
+> ⚠️ 這些資源（NAT、ALB、RDS Multi-AZ、CloudFront…）都會計費，**練習完務必 destroy**。畫面/實際上線效果只有你自己能驗證，別只看設定就宣稱完成。
+
+</details>
+
 ---
 
 ### 練習 2：對照驗收清單
 
 誠實對照上面的驗收清單，哪幾項還不夠熟？回去重看對應的 Part，補強它。
+
+<details>
+<summary>參考解答</summary>
+
+這題是自我盤點，沒有標準答案——重點是**誠實**。給你一個檢查方法：
+
+對驗收清單每一項，問自己「**我能不看教材、從頭做出來/講清楚嗎？**」，分成三級標記：
+- ✅ **能獨立做/講** → 過關。
+- 🟡 **看提示能做** → 半熟，找機會多練一次。
+- ❌ **完全卡住** → 回去重看對應 Part，並動手做一遍。
+
+**對照表（哪項不熟看哪裡）**：
+
+| 清單項目 | 回去補強 |
+|---|---|
+| 帳號安全（root/IAM/MFA/預算） | Part 1-2 |
+| IAM 最小權限 Role/Policy | Part 2 |
+| EC2 開機、選規格、計費 | Part 3 |
+| VPC 架構（子網路/IGW/NAT/SG/路由/Multi-AZ）| Part 4 |
+| S3 與儲存選型（EBS/EFS/S3）| Part 5 |
+| 受管服務（RDS/ElastiCache/ALB/CloudFront/Route53）| Part 6 |
+| 容器（ECS Fargate / EKS）| Part 7 |
+| Serverless（Lambda）與運算選型 | Part 8 |
+| CI/CD 與 IaC（Terraform）| Part 9 |
+| 監控（CloudWatch/X-Ray）與成本 | Part 10 |
+| 在各選擇間做合理取捨 | 貫穿全課 |
+
+**最重要的心法**：不熟不丟臉，**發現不熟卻不補才可惜**。針對 🟡/❌ 的項目，最好的補強是「動手再做一次」，而不是只重讀。
+
+</details>
 
 ---
 
@@ -175,6 +231,34 @@ graph LR
 - 用 **sre** 的能力定 SLO、設監控告警、做可靠性設計
 
 能做到這個，你就完成了從「初學程式」到「能獨立設計、部署、運維可靠雲端系統」的完整蛻變。🎓
+
+<details>
+<summary>參考解答</summary>
+
+這是終極整合專案，沒有標準答案，這裡給你**解題大綱 + 各書該產出什麼 + 驗收清單**。實際要**自行動手做並在 AWS 實機驗證**（記得控管成本、用完 destroy）。
+
+**四本書怎麼各司其職**：
+
+| 書 | 你要產出的東西 | 驗收點 |
+|---|---|---|
+| **basic** | 一個真的能用的 app（前端 + 後端 + 資料庫互動）| 功能跑得起來、程式碼遵守命名/函式/型別規範（見 CLAUDE.md 程式碼標準）|
+| **infra** | 把 app 容器化（Dockerfile），並能講清楚底層怎麼跑 | 本機 `docker run` 能起、你能解釋映像/網路/儲存在做什麼 |
+| **aws** | 用這章的架構部署上雲（VPC+ECS+RDS+ALB+CloudFront+網域+IaC+CI/CD）| `https://網域` 上線、push 自動部署、Terraform 可重建可銷毀 |
+| **sre** | 定 SLO/SLI、設監控與告警、做可靠性設計（降級/斷路器/Multi-AZ）| 有可量測的 SLO、告警對症狀、關掉一個 AZ 仍能服務 |
+
+**整合順序建議**：先 basic 把 app 做出來 → infra 容器化 → aws 部署上雲 → sre 補上可靠性與觀測。每一層都建立在前一層之上。
+
+**最終驗收（做到就畢業）**：
+- [ ] app 有真實功能，不是 hello world。
+- [ ] 全部基礎設施用 Terraform 管理，能一鍵重建/銷毀。
+- [ ] CI/CD 讓 `git push` 自動測試 + 部署。
+- [ ] 定義了至少一個 SLO，並有對應的 CloudWatch 告警（對症狀、不擾民）。
+- [ ] 做過至少一個可靠性設計（如：依賴服務逾時/降級、Multi-AZ、快取）。
+- [ ] 能對外人講清楚「從程式碼到上線、到可靠運維」整條鏈路。
+
+> ⚠️ 這是最大型的動手題，實際成果（上線畫面、故障演練效果）只有你自己能驗證。別只做設定就宣稱完成——真的部署、真的觀察、真的演練一次，能力才是你的。做完記得 `terraform destroy` 收乾淨。
+
+</details>
 
 > 恭喜你完成整門 AWS 課程，也完成了 basic → infra → aws → sre 的完整學習旅程！你現在具備的，是現代軟體工程最核心、最搶手的綜合能力——能寫程式、懂系統、會上雲、能把系統做得可靠。去把它用在你的專案、你的職涯上吧。這趟旅程辛苦了，也恭喜你！
 

@@ -123,6 +123,67 @@ Migration 體現了 **IaC（Infrastructure as Code，基礎設施即程式碼）
 2. 在實體加一個新屬性，產生新的 migration、套用，觀察資料庫多了那個欄位。
 3. 思考題：為什麼「用 Migration 管理資料庫結構」比「手動去資料庫改」好？列三個理由（呼應 IaC）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：建立 `InitialCreate` migration、套用、確認表建好**
+
+做法（在專案根目錄執行）：
+
+```bash
+# 若還沒裝過 dotnet ef 工具（一次性）
+dotnet tool install --global dotnet-ef
+
+# 依目前的實體與 DbContext 產生第一個 Migration
+dotnet ef migrations add InitialCreate
+
+# 套用到資料庫（真的建表）
+dotnet ef database update
+```
+
+驗收點：
+
+- `Migrations/` 資料夾出現 `xxxxxxxx_InitialCreate.cs`，打開能看到 `Up()` 裡有 `CreateTable("Todos", ...)`、`Down()` 裡有 `DropTable("Todos")`。
+- 用資料庫工具（psql、DBeaver、TablePlus 等）連上去，能看到 `Todos` 表，欄位與實體一致（`Id`、`Title`、`IsDone`、`CreatedAt`）。
+- 另外會多一張 `__EFMigrationsHistory` 表，EF Core 用它記錄「哪些 Migration 已套用過」。
+
+> 需自行實機驗證：這題要真的連上你自己的資料庫，用資料庫工具「肉眼確認」表和欄位都在。
+
+**第 2 題：加一個新屬性、產生新 Migration、套用、觀察欄位**
+
+以在 `TodoItem` 加一個 `Priority`（優先順序）為例：
+
+```csharp
+public class TodoItem
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = "";
+    public bool IsDone { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int Priority { get; set; }      // ← 新增這個屬性
+}
+```
+
+```bash
+dotnet ef migrations add AddPriority   # 產生「只加 Priority 欄位」的 Migration
+dotnet ef database update              # 套用
+```
+
+驗收點：新的 Migration 檔 `Up()` 裡是 `AddColumn<int>("Priority", "Todos", ...)`（注意它只描述「這次的差異」，不會整張表重建）；套用後用資料庫工具看 `Todos` 表，會多出 `Priority` 欄位。
+
+> 需自行實機驗證：一樣要連上資料庫確認欄位真的多了。
+
+**第 3 題（思考題）：Migration 比手動改資料庫好在哪？列三個理由**
+
+1. **有版本、可追蹤**：每次結構變更都是一個進 Git 的檔案，誰、何時、改了什麼一目了然，還能 code review。手動下 SQL 改則完全沒記錄。
+2. **可重現、可同步**：同一批 Migration 檔，隊友、測試環境、正式環境都照著 `database update` 跑一遍，就能得到一模一樣的結構。手動改則每個環境都要有人記得重下一次 SQL，極易漏掉或不一致。
+3. **可回復**：每個 Migration 都有 `Down()`，改錯了可以退回上一版（`dotnet ef database update 上一個Migration名`）。手動改要退回得自己記得反向 SQL 怎麼寫。
+4. （加分）**和程式碼同源、不易失準**：Migration 由實體自動產生，資料庫結構跟著程式碼一起演進、一起版控，比較不會出現「程式碼的實體」和「資料庫實際結構」對不上的情況。
+
+這正是 IaC（Infrastructure as Code）的精神——用程式碼（可版控、可審查、可重現）管理基礎設施，而不是靠手動點按操作。和 aws/infra 課程用 Terraform 管雲端資源是同一套思想。
+
+</details>
+
 ## 課外讀物
 
 > IaC（基礎設施即程式碼）的精神 → **aws 課程 Part 9（Terraform）**、**infra 課程 Part 6**

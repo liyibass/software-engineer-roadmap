@@ -177,6 +177,53 @@ GET  /deleteUser/3
 
 **練習 3**：「一篇文章底下的所有留言」這個資源，網址該怎麼設計？（提示：留言從屬於文章，用巢狀的方式。）那「文章 7 的第 2 則留言」呢？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**
+
+「部落格文章（posts）」的一組 RESTful API——整組只需要兩個網址（`/posts` 和 `/posts/:id`），靠不同方法表達不同操作：
+
+```
+方法     網址            意義
+────────────────────────────────────────
+GET     /posts          取得所有文章
+POST    /posts          新增一篇文章
+GET     /posts/:id      取得單篇文章
+PUT     /posts/:id      更新單篇文章
+DELETE  /posts/:id      刪除單篇文章
+```
+
+重點：網址一律用名詞複數 `posts`，「要做什麼」交給方法，網址裡不出現 `get`、`create`、`delete` 這些動詞。
+
+**練習 2**
+
+把不 RESTful 的寫法改掉——關鍵是「拿掉網址裡的動詞、把動作改用對的 HTTP 方法表達」：
+
+```
+原本                     改成
+────────────────────────────────────────────
+GET  /fetchAllUsers  →  GET    /users      （取得所有使用者）
+POST /user/create    →  POST   /users      （新增使用者；資源用複數 users）
+GET  /deleteUser/3   →  DELETE /users/3    （刪除 3 號使用者）
+```
+
+特別注意第三個：原本用 `GET` 卻在做「刪除」是很危險的——`GET` 應該只是「看」、不改變資料。刪除要用 `DELETE` 方法，而且網址只留名詞 `/users/3`。
+
+**練習 3**
+
+留言（comments）從屬於文章（posts），用巢狀網址表達這個從屬關係：
+
+```
+/posts/:postId/comments        → 某篇文章底下的「所有留言」
+/posts/7/comments              → 文章 7 底下的所有留言
+/posts/7/comments/2            → 文章 7 的第 2 則留言
+```
+
+所以「文章 7 的第 2 則留言」就是 `/posts/7/comments/2`。這種巢狀讀起來就像句子：「posts 底下的第 7 篇、它的 comments 底下的第 2 則」，一看網址就知道在指哪個東西。
+
+</details>
+
 ---
 
 ## 課外讀物

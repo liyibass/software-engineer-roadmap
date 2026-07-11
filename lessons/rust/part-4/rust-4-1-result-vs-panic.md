@@ -111,6 +111,61 @@ fn main() {
 2. 寫一個函式 `fn safe_divide(a: i32, b: i32) -> Result<i32, String>`：`b` 不為 0 回傳 `Ok(a / b)`，為 0 回傳 `Err(String::from("除數不能為零"))`。在 `main` 用 `match` 測試兩種情況。
 3. 思考題：「使用者在表單輸入了非數字」應該用 `panic!` 還是 `Result`？「程式算出一個負的陣列長度（理論上不可能）」呢？說說你的判斷。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：故意製造 `Err` 並印出訊息**
+
+```rust
+fn main() {
+    let parsed = "abc".parse::<i32>();
+
+    match parsed {
+        Ok(n) => println!("轉成功，數字是 {}", n),
+        Err(e) => println!("轉失敗：{}", e),
+    }
+}
+```
+
+`"abc"` 沒辦法變成整數，所以 `parse` 回傳的是 `Err`，程式會走 `Err(e)` 那條，印出類似 `轉失敗：invalid digit found in string`。這裡的 `e` 型別是 `std::num::ParseIntError`，它有實作 `Display`，所以可以直接用 `{}` 印出人看得懂的訊息。
+
+**練習 2：`safe_divide`**
+
+```rust
+fn safe_divide(a: i32, b: i32) -> Result<i32, String> {
+    if b == 0 {
+        Err(String::from("除數不能為零"))
+    } else {
+        Ok(a / b)
+    }
+}
+
+fn main() {
+    // 正常情況
+    match safe_divide(10, 2) {
+        Ok(result) => println!("10 / 2 = {}", result),
+        Err(e) => println!("出錯：{}", e),
+    }
+
+    // 除以零
+    match safe_divide(10, 0) {
+        Ok(result) => println!("10 / 0 = {}", result),
+        Err(e) => println!("出錯：{}", e),
+    }
+}
+```
+
+執行結果會印出 `10 / 2 = 5` 和 `出錯：除數不能為零`。重點是：把「可能失敗」寫進回傳型別 `Result<i32, String>` 後，呼叫端**被迫**用 `match`（或後面會學的 `?`）面對兩種結果，沒辦法假裝除法一定成功。這裡先檢查 `b == 0` 是刻意的——如果直接寫 `a / b` 而 `b` 是 0，Rust 的整數除法會直接 panic，那就變成不可恢復的錯誤了，不是我們要的。
+
+**練習 3：思考題**
+
+- 「使用者在表單輸入了非數字」→ 應該用 **`Result`**。使用者亂打字是「預期之內」會發生的事，程式不該因為別人手滑就整個中止；正確做法是回傳 `Err`，讓上層顯示「請輸入數字」這類友善提示，請使用者重試。
+- 「程式算出一個負的陣列長度（理論上不可能）」→ 應該用 **`panic!`**。長度照定義不可能是負的，如果真的算出負數，代表程式邏輯有 bug、進入了「絕不該發生」的狀態。這時候繼續跑下去只會讓錯誤擴散、資料更難追查，直接 `panic!` 停下來、把問題暴露出來反而是對的。
+
+一句話抓重點：錯誤的來源是「外界的正常變化」就用 `Result`，是「自己程式的邏輯壞掉」就用 `panic!`。
+
+</details>
+
 ## 課外讀物
 
 > 「錯誤訊息要對人有意義、不要吃掉錯誤」 → [課外讀物 E-6-8：後端 Clean Code（錯誤處理）](../../../課外讀物/E-6-best-practices/E-6-8-backend-clean-code.md)

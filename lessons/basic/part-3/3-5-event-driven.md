@@ -335,15 +335,143 @@ if (todoList) {
 
 在頁面上放一個 `<div>`，讓它在滑鼠移入時背景變成藍色，移出時恢復白色。（提示：`mouseenter` 和 `mouseleave`，用 `element.style.backgroundColor` 改顏色）
 
+<details>
+<summary>參考解答</summary>
+
+HTML 放一個有大小的 `<div>`（否則沒內容會看不出範圍）：
+
+```html
+<div id="hoverBox" style="width: 200px; height: 200px; border: 1px solid #ccc;"></div>
+```
+
+TypeScript 分別監聽 `mouseenter` 和 `mouseleave`：
+
+```typescript
+const box = document.querySelector<HTMLDivElement>("#hoverBox")
+
+if (box) {
+  box.addEventListener("mouseenter", () => {
+    box.style.backgroundColor = "blue"   // 滑鼠移入 → 藍色
+  })
+
+  box.addEventListener("mouseleave", () => {
+    box.style.backgroundColor = "white"  // 滑鼠移出 → 白色
+  })
+}
+```
+
+說明：
+
+- `mouseenter` 在滑鼠**進入**元素時觸發一次，`mouseleave` 在**離開**時觸發一次，剛好一對。
+- 用 `if (box)` 先確認元素存在，是本章一直強調的 null 檢查習慣（`querySelector` 找不到會回傳 `null`）。
+- 這裡用 `element.style.backgroundColor` 直接改是為了配合題目提示；實務上更推薦切換 class（例如 `box.classList.toggle("hover-blue")`），把顏色細節留給 CSS，如本章與 3-4 章所提。
+
+**請自行實機驗證**：滑鼠移到方框上會變藍，移開恢復白色。
+
+</details>
+
 **練習二**
 
 製作一個字數計算器：有一個 `<textarea>` 和一個 `<span>`，每次輸入內容時，`<span>` 即時顯示目前輸入了幾個字元。（提示：用 `input` 事件，`event.target` 的 `value.length`）
+
+<details>
+<summary>參考解答</summary>
+
+HTML：
+
+```html
+<textarea id="editor" placeholder="開始打字..."></textarea>
+<p>目前字數：<span id="counter">0</span></p>
+```
+
+TypeScript：
+
+```typescript
+const editor = document.querySelector<HTMLTextAreaElement>("#editor")
+const counter = document.querySelector<HTMLSpanElement>("#counter")
+
+if (editor && counter) {
+  editor.addEventListener("input", (event) => {
+    // event.target 是觸發事件的元素，斷言成 textarea 才能讀 .value
+    const target = event.target as HTMLTextAreaElement
+    counter.textContent = String(target.value.length)
+  })
+}
+```
+
+說明：
+
+- 用 **`input` 事件**而不是 `change`——`input` 在**每打一個字**就觸發（即時更新），`change` 要等失焦才觸發（達不到即時效果）。這是本章事件類型表格裡兩者的關鍵差別。
+- `event.target` 是觸發事件的元素，這裡就是那個 `<textarea>`；斷言成 `HTMLTextAreaElement` 後才能安全存取 `.value`。你也可以直接用外層的 `editor.value`，效果相同。
+- `value.length` 是字串長度，也就是字元數；`textContent` 只吃字串，所以用 `String(...)` 轉一下。
+
+**請自行實機驗證**：在文字框裡打字，`<span>` 的數字會隨著每個按鍵即時跳動；刪字時數字也會減少。
+
+</details>
 
 **練習三**
 
 延伸本章的 Todo App 範例，加入以下功能：
 - 按下 `Escape` 鍵時清空輸入框（提示：`event.key === "Escape"`）
 - 雙擊（`dblclick`）某個 Todo 項目時，把它標記為完成（加上刪除線樣式）：用事件委派監聽整個列表，在 `li` 上切換 CSS class
+
+<details>
+<summary>參考解答</summary>
+
+**第一個功能：按 Escape 清空輸入框。** 在輸入框的 `keydown` 監聽器裡多判斷一個 `event.key`：
+
+```typescript
+const input = document.querySelector<HTMLInputElement>("#todoInput")
+
+if (input) {
+  input.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key === "Enter") {
+      const text = input.value.trim()
+      if (text !== "") {
+        addTodo(text)
+        input.value = ""
+      }
+    } else if (event.key === "Escape") {
+      input.value = ""   // 按 Escape 直接清空
+    }
+  })
+}
+```
+
+**第二個功能：雙擊 Todo 標記完成（事件委派）。** 在 `<ul>` 上掛一個 `dblclick` 監聽器，靠冒泡處理所有 `<li>`：
+
+```typescript
+const todoList = document.querySelector<HTMLUListElement>("#todoList")
+
+if (todoList) {
+  todoList.addEventListener("dblclick", (event: MouseEvent) => {
+    const target = event.target as HTMLElement
+    // 從被雙擊的位置往上找到最近的 <li>
+    const listItem = target.closest<HTMLLIElement>("li")
+    if (listItem) {
+      listItem.classList.toggle("completed")   // 切換完成樣式
+    }
+  })
+}
+```
+
+搭配 CSS：
+
+```css
+#todoList li.completed {
+  text-decoration: line-through;
+  color: #aaa;
+}
+```
+
+說明：
+
+- **Escape 功能**沿用同一個 `keydown` 監聽器，只是多一個 `else if` 分支，靠 `event.key === "Escape"` 判斷；`event.key` 是本章介紹的「按了哪個鍵」屬性。
+- **雙擊完成**用的是**事件委派**：不管有幾個 `<li>`、也不管之後動態新增多少個，都只在父層 `<ul>` 掛一個 `dblclick`。事件從被點的元素冒泡上來，用 `event.target.closest("li")` 找到對應的那一行 `<li>`（即使雙擊到 `<li>` 裡的刪除按鈕，`closest` 也能往上定位到 `<li>`），再 `toggle("completed")` 切換樣式。這正是本章「一個監聽器處理全部項目」的核心價值。
+
+**請自行實機驗證**：輸入文字後按 Escape，輸入框應清空；雙擊任一 Todo，該行出現刪除線，再雙擊一次取消。
+
+</details>
 
 ## 課外讀物
 

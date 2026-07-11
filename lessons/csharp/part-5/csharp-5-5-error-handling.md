@@ -132,6 +132,62 @@ public IActionResult GetById(int id)
 2. 寫一個 Action，查不到資料時用 `Problem(...)` 回傳 404 + 有意義的 detail 訊息。
 3. 思考題：為什麼「統一錯誤處理」比「每個 Action 各自 try/catch」好？列兩個理由。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：在 `Program.cs` 啟用 `AddProblemDetails()` + `UseExceptionHandler()`，然後在某個 Action 故意丟例外，觀察被自動轉成的標準錯誤格式。
+
+```csharp
+// === Program.cs ===
+builder.Services.AddProblemDetails();   // 啟用 ProblemDetails 標準錯誤格式
+
+var app = builder.Build();
+app.UseExceptionHandler();              // 放在管道最前面，攔截所有未處理例外
+app.MapControllers();
+app.Run();
+```
+
+```csharp
+// 某個 Action 故意丟例外（模擬未預期的錯誤）
+[HttpGet("boom")]
+public IActionResult Boom()
+{
+    throw new InvalidOperationException("測試用的爆炸");
+}
+```
+
+驗收點：呼叫 `GET /api/.../boom`，你不會看到醜陋的堆疊追蹤，而是收到 **500** + 一份標準 ProblemDetails JSON（含 `type`、`title`、`status`、`traceId`）。這代表 `UseExceptionHandler()` 成功把未處理例外統一接住了。**需自行實機跑起來觀察回應。**
+
+**第 2 題**：查不到資料時用 `Problem(...)` 回傳 404 + 對人有意義的 detail。
+
+```csharp
+[HttpGet("{id}")]
+public IActionResult GetById(int id)
+{
+    var user = _service.GetUser(id);
+    if (user == null)
+    {
+        return Problem(
+            title: "找不到使用者",
+            detail: $"找不到 ID 為 {id} 的使用者",   // 對人有意義，而非 "error"
+            statusCode: 404
+        );
+    }
+    return Ok(user);
+}
+```
+
+驗收點：查一個不存在的 id（例如 `/api/users/9999`），回應是 **404** + ProblemDetails，`detail` 欄位清楚寫著「找不到 ID 為 9999 的使用者」——客戶端一看就知道是什麼問題。**可自行實機驗證。**
+
+**第 3 題（思考題）**：統一錯誤處理勝過每個 Action 各自 try/catch 的理由（任舉兩個）——
+
+1. **不重複、不漏接（DRY + 可靠）**：try/catch 散落在每個 Action，不僅重複一堆樣板程式碼，還很容易有某個 Action 忘了包 try/catch，導致例外漏出去變成醜陋的 500。集中在一處攔截，保證「任何地方丟的例外」都被接住，一勞永逸。
+2. **格式一致（對客戶端友善）**：各自 catch 很容易每個地方回傳的錯誤格式都不一樣，客戶端得應付五花八門的錯誤結構。集中處理能保證**所有錯誤都用同一種格式（ProblemDetails）回**，客戶端用一套邏輯就能處理所有錯誤。
+
+（補充第三個理由：**關注點分離**——Action 只專注業務邏輯、只管丟有意義的例外，「例外 → HTTP 狀態碼」的轉換集中在全域處理器，程式更乾淨。）
+
+</details>
+
 ## 課外讀物
 
 > 錯誤訊息設計、別吞錯誤 → [課外讀物 E-6-8：後端 Clean Code](../../../課外讀物/E-6-best-practices/E-6-8-backend-clean-code.md)；例外處理 → [csharp-3-5]

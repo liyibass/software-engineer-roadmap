@@ -137,6 +137,85 @@ graph TB
 2. 定義一個政策（如「VIP」），套用到某端點。
 3. 寫一個「更新使用者個人資料」的端點，加上「只能改自己的」檢查（從 JWT 取 userId 比對），不符回 Forbid()。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：只有 Admin 能刪文章**（需自行實機驗證）
+
+做法：
+
+```csharp
+[Authorize(Roles = "Admin")]      // 只有角色為 Admin 的 token 能過
+[HttpDelete("api/articles/{id}")]
+public async Task<IActionResult> DeleteArticle(int id)
+{
+    var article = await _db.Articles.FindAsync(id);
+    if (article == null) return NotFound();
+    _db.Articles.Remove(article);
+    await _db.SaveChangesAsync();
+    return NoContent();
+}
+```
+
+驗收點：
+
+- 不帶 token → **401**（未認證）。
+- 帶「角色是 User」的 token → **403 Forbidden**（已認證、但角色不符）。
+- 帶「角色是 Admin」的 token → **204 No Content**（成功刪除）。
+
+關鍵是確認：角色不符時是 **403 而不是 401**——因為使用者已經通過認證（token 有效），只是權限不夠。要讓角色生效，簽發 JWT 時必須有放 `new Claim(ClaimTypes.Role, "Admin")`。
+
+> 需實際跑起來、用不同角色的 token 發請求觀察狀態碼，請自行在本機實機驗證。
+
+**第 2 題：定義並套用一個 VIP 政策**
+
+在 `Program.cs` 定義政策：
+
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    // 要求 token 內帶有 Membership=VIP 這個 claim
+    options.AddPolicy("Vip", policy =>
+        policy.RequireClaim("Membership", "VIP"));
+});
+```
+
+套用到端點：
+
+```csharp
+[Authorize(Policy = "Vip")]
+[HttpGet("api/vip-lounge")]
+public IActionResult GetVipContent() => Ok("歡迎光臨 VIP 專區");
+```
+
+要讓政策通過，簽發 JWT 時得放對應的 claim：`new Claim("Membership", "VIP")`。沒有這個 claim 的使用者存取會被擋成 **403**。這裡用 `RequireClaim` 示範最簡單的政策；若規則更複雜（例如「VIP 且註冊滿 30 天」）可以組合多個 `Require...` 條件，甚至寫自訂 `AuthorizationHandler`。
+
+**第 3 題：更新個人資料，只能改自己的**
+
+```csharp
+[Authorize]
+[HttpPut("api/users/{id}")]
+public async Task<IActionResult> UpdateProfile(int id, [FromBody] UpdateProfileDto dto)
+{
+    var user = await _db.Users.FindAsync(id);
+    if (user == null) return NotFound();
+
+    // 資源擁有權檢查：要改的這個 user，是不是「當前登入的人」自己？
+    var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+    if (user.Id != currentUserId)
+        return Forbid();        // 403：想改別人的資料，不准
+
+    user.DisplayName = dto.DisplayName;
+    user.Bio = dto.Bio;
+    await _db.SaveChangesAsync();
+    return NoContent();
+}
+```
+
+重點：光有 `[Authorize]` 只保證「有登入」，擋不住「登入的人去改別人的資料」。所以要在 Action 裡從 JWT 取出 `currentUserId`（`ClaimTypes.NameIdentifier`），比對「要修改的資源擁有者」是不是同一人，不符就 `Forbid()`（403）。這一層「資源擁有權檢查」是很多真實系統會漏掉、進而造成越權漏洞的地方，務必記得做。
+
+</details>
+
 ## 課外讀物
 
 > 授權、權限控管、常見漏洞 → [課外讀物 E-10：Web Security](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)；認證 vs 授權 → [csharp-7-1]

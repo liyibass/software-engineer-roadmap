@@ -159,6 +159,15 @@ docker network create mynet
 1. 一個 Image 可以跑出幾個 Container？
 2. `docker run nginx` 這個動作，用模具/餅乾的話來說是在做什麼？
 
+<details>
+<summary>參考解答</summary>
+
+1. **一個 Image 可以跑出很多個 Container**，數量沒有限制。就像一個做餅乾的模具，可以壓出無數塊餅乾。Image 是唯讀的、靜態的「模具/藍圖」，本身不會動；Container 是拿它跑起來、活的實體。你可以用同一個 `nginx` image 同時跑 5 個、10 個 nginx 容器，彼此獨立。（對照 Part 2-3：Image 之於 Container，就像「程式」之於「行程」——靜態範本對上動態實例。）
+
+2. **`docker run nginx` = 拿「nginx 這個模具」壓出一塊「真正的餅乾」。** 也就是：以 `nginx` image 當藍圖，做出一個正在跑的 nginx 容器。模具（image）本身不會動，這個動作是把它變成一個活的、正在運作的實體（container）。
+
+</details>
+
 ---
 
 ### 練習 2：理解「為什麼需要 Volume」
@@ -168,6 +177,17 @@ docker network create mynet
 1. 容器被刪掉時，裡面的資料會怎樣？
 2. 如果你在容器裡跑資料庫，卻沒用 Volume，重建容器後會發生什麼災難？
 3. Volume 怎麼解決這個問題？
+
+<details>
+<summary>參考解答</summary>
+
+1. **容器被刪掉時，裡面的資料會全部消失。** 這是 Docker 刻意的設計——容器被設計成「用完即丟、隨時可重建」，寫在容器內部的東西跟著容器一起被清掉。
+
+2. **會發生資料全毀的災難。** 資料庫的所有資料（使用者帳號、訂單、你辛苦累積的一切）都存在容器內部。一旦你為了升級、改設定、或容器壞掉而重建（`docker rm` 再 `docker run`），新容器是全新乾淨的，**舊資料一去不回**。等於資料庫被清空重來。
+
+3. **Volume 把重要資料存在「容器之外」。** Volume 是一塊獨立於容器的儲存空間，掛載進容器的某個路徑（例如資料庫的資料目錄）。容器把資料寫進這個路徑時，實際上是寫進 Volume 裡。這樣就算容器被刪掉重建，**資料還安穩地留在 Volume 裡**，新容器只要掛上同一個 Volume 就能接續使用。用類比：容器是隨時可能格式化重灌的電腦，Volume 是外接硬碟——重灌電腦，外接硬碟的檔案不受影響。（這也呼應 Part 2-4 的「掛載」概念。）
+
+</details>
 
 ---
 
@@ -183,6 +203,31 @@ docker stop web && docker rm web             # 收掉它
 ```
 
 `curl` 應該看到 nginx 的歡迎 HTML。想想看：你只下了一行 `docker run`，就有了一個完整的網頁伺服器——這比 Part 4 手動裝 nginx 快多少？
+
+<details>
+<summary>參考解答</summary>
+
+這是動手／實機題，需要在你自己的伺服器上實際跑過驗證。照著章節那一輪指令做即可：
+
+```bash
+docker run -d -p 8080:80 --name web nginx   # 用 nginx image 跑一個背景容器，主機 8080 接容器 80
+docker ps                                    # 確認 web 容器狀態是 Up
+curl http://localhost:8080                   # 測它有沒有回應
+docker stop web && docker rm web             # 停止並刪除，收乾淨
+```
+
+**各步驟驗收點**：
+
+- `docker run` 後會印出一長串容器 ID，代表容器已在背景啟動（`-d`）。
+- `docker ps` 要看到一列 `web`、STATUS 顯示 `Up ...`、PORTS 顯示 `0.0.0.0:8080->80/tcp`（埠映射成功）。
+- `curl http://localhost:8080` 要收到 nginx 的歡迎 HTML（開頭大概是 `<!DOCTYPE html>`、內容有「Welcome to nginx!」）。若連不到，先用 `docker ps` 確認容器真的在跑、埠有沒有映對。
+- `docker stop web && docker rm web` 之後再 `docker ps`，`web` 應該消失了。
+
+**「比 Part 4 手動裝快多少」的重點**：Part 4 手動裝 nginx 要 `apt install`、改設定檔、開服務、處理相依……好幾個步驟；這裡**一行 `docker run` 就有了一個完整、乾淨、可隨手丟掉的網頁伺服器**，而且不會在主機留下任何殘留。這就是 image + container 的威力。
+
+> 這是實機操作，請以你自己伺服器上的實際輸出為準自行驗證。
+
+</details>
 
 ## 課外讀物
 

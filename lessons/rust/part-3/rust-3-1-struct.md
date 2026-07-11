@@ -120,6 +120,61 @@ fn main() {
 2. 把上面的 `Book` 實例改成 `mut`，把 `rating` 改成另一個值再印出。
 3. 用 `build_user` 那種「欄位簡寫」寫一個 `fn build_book(title: String, pages: u32) -> Book`，`rating` 預設給 `0.0`。
 
+<details>
+<summary>參考解答</summary>
+
+三題可以放在同一個檔案裡練習，這裡一次寫完給你看：
+
+```rust
+// 型別名用 PascalCase
+struct Book {
+    title: String,
+    pages: u32,
+    rating: f64,
+}
+
+// 第 3 題：用「欄位簡寫」建立 Book
+// title 與 pages 剛好和欄位同名，可以省略 `title: title`、`pages: pages`
+fn build_book(title: String, pages: u32) -> Book {
+    Book {
+        title,
+        pages,
+        rating: 0.0,   // 預設分數
+    }
+}
+
+fn main() {
+    // 第 1 題：建立一本書的實例並印出三個欄位
+    let book = Book {
+        title: String::from("Rust 權威指南"),
+        pages: 560,
+        rating: 4.8,
+    };
+    println!("《{}》，{} 頁，評分 {}", book.title, book.pages, book.rating);
+
+    // 第 2 題：要改欄位 → 整個實例宣告成 mut
+    let mut book2 = Book {
+        title: String::from("深入淺出 Rust"),
+        pages: 320,
+        rating: 4.0,
+    };
+    book2.rating = 4.5;   // 修改欄位
+    println!("《{}》改後評分：{}", book2.title, book2.rating);
+
+    // 第 3 題：用 build_book 建立，rating 自動是 0.0
+    let book3 = build_book(String::from("尚未評分的新書"), 200);
+    println!("《{}》預設評分：{}", book3.title, book3.rating);
+}
+```
+
+幾個重點提醒：
+
+- **第 2 題**：Rust 沒有「只有某個欄位可變」這種事——可變性是針對「整個實例」的。所以要改 `rating`，就得在 `let` 後面加 `mut`（`let mut book2 = ...`），否則編譯器會報錯。
+- **第 3 題**：因為參數名 `title`、`pages` 剛好跟欄位同名，才能用簡寫。如果參數叫別的名字（例如 `name`），就得乖乖寫成 `title: name`。
+- `rating` 用 `f64`，所以預設值要寫 `0.0` 而不是 `0`（`0` 會被推斷成整數，型別對不上）。
+
+</details>
+
 ## 課外讀物
 
 > struct 是組織資料的基礎，好的命名讓欄位自我說明 → [課外讀物 E-6-2：命名的藝術](../../../課外讀物/E-6-best-practices/E-6-2-naming.md)

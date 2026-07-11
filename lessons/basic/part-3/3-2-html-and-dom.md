@@ -274,11 +274,76 @@ addButton.addEventListener('click', () => {
 
 畫完後問自己：`<h2>` 的父節點是誰？`<a href="/">` 和 `<a href="/about">` 是什麼關係？
 
+<details>
+<summary>參考解答</summary>
+
+畫出來的 DOM Tree 如下（用縮排表示父子關係）：
+
+```
+<body>
+  ├── <header>
+  │     ├── <h1>我的部落格</h1>
+  │     └── <nav>
+  │           ├── <a href="/">首頁</a>
+  │           └── <a href="/about">關於我</a>
+  └── <main>
+        └── <article>
+              ├── <h2>第一篇文章</h2>
+              └── <p>文章內容在這裡。</p>
+```
+
+畫成正式的樹狀圖是這樣：
+
+```mermaid
+graph TB
+    body["&lt;body&gt;"]
+    header["&lt;header&gt;"]
+    main["&lt;main&gt;"]
+    h1["&lt;h1&gt;"]
+    nav["&lt;nav&gt;"]
+    a1["&lt;a&gt; 首頁"]
+    a2["&lt;a&gt; 關於我"]
+    article["&lt;article&gt;"]
+    h2["&lt;h2&gt;"]
+    p["&lt;p&gt;"]
+
+    body --> header
+    body --> main
+    header --> h1
+    header --> nav
+    nav --> a1
+    nav --> a2
+    main --> article
+    article --> h2
+    article --> p
+```
+
+回答兩個問題：
+
+- **`<h2>` 的父節點是誰？** 是 `<article>`。往上追一層是誰包住它，`<h2>` 被 `<article>` 直接包住，所以 `<article>` 是它的父節點（`<main>` 是祖父節點，不是父節點）。
+- **兩個 `<a>` 是什麼關係？** 它們是**兄弟節點**（Sibling）——同一層、共用同一個父節點 `<nav>`。
+
+</details>
+
 **練習 2**：建立一個 `index.html` 檔案，把 Todo App 的骨架貼進去，用瀏覽器打開。
 
 然後按 `F12` 打開 DevTools，切到 **Elements** 分頁。用滑鼠展開各個節點，試著找到 `id="todo-input"` 和 `id="add-btn"` 這兩個元素。
 
 > 小技巧：點 Elements 分頁左上角的箭頭圖示，再點頁面上的按鈕，DevTools 會自動定位到那個節點。
+
+<details>
+<summary>參考解答</summary>
+
+這題要動手操作 DevTools，**請自行實機驗證**。做法與驗收點如下：
+
+1. 把 3-2 的 Todo App 骨架存成 `index.html`，用瀏覽器打開。
+2. 按 `F12`（Mac 是 `Cmd + Option + I`）打開 DevTools，切到 **Elements** 分頁。
+3. 在 Elements 裡逐層點開小三角形：`<html>` → `<body>` → `<div id="app">` → `<div class="input-area">`，就會看到裡面的 `<input id="todo-input">` 和 `<button id="add-btn">`。
+4. 用小技巧更快：點 Elements 分頁左上角的**箭頭圖示**（游標選取工具），再點頁面上的輸入框或「新增」按鈕，DevTools 會自動把對應的節點反白。
+
+驗收點：你能在 Elements 樹裡找到 `id="todo-input"` 和 `id="add-btn"` 這兩個節點，並且發現它們都被包在 `class="input-area"` 的 `<div>` 底下——這代表你能把「畫面上看到的東西」對應回「DOM Tree 上的節點」。
+
+</details>
 
 **練習 3**：在 Todo App 的骨架基礎上，新增一個「頁首」區塊，讓最終結構如下：
 
@@ -290,3 +355,31 @@ addButton.addEventListener('click', () => {
 ```
 
 不需要寫 CSS，只要讓 HTML 結構正確。完成後用 DevTools 的 Elements 分頁確認樹狀結構和你預期的一樣。
+
+<details>
+<summary>參考解答</summary>
+
+在 `<div id="app">` 最上面加一個 `<header>`，裡面放原本的 `<h1>` 和一段描述文字。完整結構如下：
+
+```html
+<div id="app">
+  <header>
+    <h1>我的待辦清單</h1>
+    <p>記錄今天要完成的事情</p>
+  </header>
+  <div class="input-area">
+    <input type="text" id="todo-input" placeholder="新增待辦事項..." />
+    <button id="add-btn">新增</button>
+  </div>
+  <ul id="todo-list"></ul>
+</div>
+```
+
+重點說明：
+
+- `<header>`、`<div class="input-area">`、`<ul id="todo-list">` 三者是**兄弟節點**，都直接被 `<div id="app">` 包住。
+- `<h1>` 和 `<p>` 被移進 `<header>` 裡，所以它們的父節點從 `<div id="app">` 變成了 `<header>`——這就是「調整樹狀結構」的實際感受。
+
+驗收點（**請自行實機驗證**）：打開 DevTools 的 Elements 分頁，展開 `<div id="app">`，應該看到第一個子節點是 `<header>`，而 `<h1>` 和 `<p>` 都縮在 `<header>` 底下，與你上面預期的樹一致。
+
+</details>

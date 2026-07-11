@@ -133,11 +133,47 @@ S3 還有個方便功能——**靜態網站託管（static website hosting）**
 
 照著六步，把你自己的 `index.html` 公開上線。改一下網頁內容（加你的名字、做點裝飾），重新上傳，看看變化。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，**需自行在 AWS 實機操作驗證**（agent 看不到你的畫面）。照本章六步做，重點與驗收點：
+
+1. **準備 `index.html`**：在自己電腦建好檔案，加上你的名字、改點文字或簡單 CSS 裝飾。
+2. **建 Bucket**：S3 → Create bucket，名字取**全球唯一**的（如 `my-first-site-你的名字-1234`）；**取消勾選「Block all public access」**並在跳出的警告打勾確認（因為要公開）。
+3. **上傳**：進 bucket → Upload → 把 `index.html` 拖進去。
+4. **開啟靜態網站託管**：Properties → Static website hosting → Edit → Enable → Index document 填 `index.html` → 儲存，記下它給的**網站端點網址**（`http://...s3-website-...amazonaws.com`）。
+5. **設 Bucket Policy**：Permissions → Bucket policy → 貼上本章那段 JSON，把 `你的bucket名稱` 換成你的實際名稱 → 儲存。
+6. **驗收**：打開第 4 步的網址，應看到你的網頁內容。
+
+**改內容再看變化**：把 `index.html` 改一版（例如換標題、加段文字），到 bucket 重新 **Upload**（同名覆蓋），再重新整理網址。
+
+- 驗收點：頁面內容跟著更新。
+- 小提醒：若改了看不到變化，通常是**瀏覽器或 CDN 快取**——強制重新整理（Ctrl/Cmd+Shift+R）或稍等一下再看。
+- 記得練習完依 aws-1-3 的習慣**清理**：刪掉 bucket 裡的檔案再刪 bucket，避免留著忘了的資源。
+
+</details>
+
 ---
 
 ### 練習 2：回顧你碰到的概念
 
 不看上面的表，回想：剛剛這個流程，你接觸到了哪些 AWS 概念？（提示：Region、S3、bucket、政策、網站託管…）
+
+<details>
+<summary>參考解答</summary>
+
+這 6 步其實濃縮了 AWS 好幾根核心支柱：
+
+- **Region（區域）**：一開始確認右上角選好的 Region，決定你的 bucket 建在哪個地理區域（aws-1-2 學過的全球架構）。
+- **S3（物件儲存）**：把檔案丟上雲端穩穩存著的服務（Part 5 會深入）。
+- **Bucket（儲存桶）** 與 **Object（物件）**：bucket 是放檔案的容器（名字全球唯一），你上傳的 `index.html` 就是一個 object。
+- **Bucket Policy / IAM 權限政策**：那段 `Effect: Allow`、`Principal: *`、`Action: s3:GetObject` 的 JSON，是一份「允許任何人讀取這個 bucket 物件」的權限政策（Part 2 IAM 會逐行解析）。
+- **靜態網站託管（static website hosting）**：讓 S3 直接把 bucket 當網站對外提供、給你一個網址，不用自己架伺服器（Part 5 深入）。
+- **公開存取 / 安全設定**：取消「Block all public access」這步，其實碰到了「公開 vs 封鎖」的安全考量（Part 5 會談）。
+
+一句話：你不是亂點，而是實際摸到了 Region、S3 物件儲存、IAM 政策、網站託管這幾根支柱。
+
+</details>
 
 ---
 
@@ -145,7 +181,17 @@ S3 還有個方便功能——**靜態網站託管（static website hosting）**
 
 這個「S3 靜態網站」能放 HTML、圖片、CSS、JS。但它能跑「後端程式」（例如處理登入、連資料庫）嗎？為什麼不行？
 
-> 提示：S3 只是「放檔案、回傳檔案」，它不會「執行程式」。要跑後端，需要會運算的東西——那就是 Part 3 的 EC2、Part 8 的 Lambda。這也預告了你接下來的學習。
+<details>
+<summary>參考解答</summary>
+
+**不行。** 因為 S3 靜態網站的本質只是「**放檔案、回傳檔案**」——你請求 `index.html`，它就把那個檔案原封不動送回給你，**它不會「執行」任何程式**。
+
+- 你放的 JS 檔確實會被送到瀏覽器、在**使用者的瀏覽器裡**執行（那是前端），但 S3 伺服器端本身不跑任何程式邏輯。
+- 而「處理登入、連資料庫」這類**後端**工作，需要在**伺服器端執行程式碼**：比對帳密、查詢/寫入資料庫、產生動態回應…這些都需要一個「會運算、能跑程式」的東西。S3 沒有這個能力，它是純儲存服務。
+
+所以要跑後端，就得換成**會運算的服務**：**Part 3 的 EC2**（自己有一台會跑程式的虛擬機）或 **Part 8 的 Lambda**（不用管機器、丟一段程式碼給它按需執行）。這也正好預告了你接下來要學的東西——從「只會回傳檔案的靜態網站」進化到「能執行邏輯的動態後端」。
+
+</details>
 
 ## 課外讀物
 

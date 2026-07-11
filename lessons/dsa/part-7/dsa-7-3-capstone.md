@@ -141,6 +141,87 @@ suggest（自動補全）：
 2. 分析你加的功能的複雜度。
 3. 用 [dsa-7-2] 的解題框架，挑一個你有興趣的小問題（如「LRU 快取」「找出文章中最常出現的詞」），設計它該用哪些資料結構，並說明理由。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：讓 `suggest` 只回傳「前 N 個最熱門」。有兩個做法：
+
+**做法 A：排序後取前 N（簡單直白）**——在原本排序後多切一刀 `slice(0, n)`：
+
+```typescript
+suggest(prefix: string, n: number = Infinity): string[] {
+  let node = this.root;
+  for (const char of prefix) {
+    if (!node.children.has(char)) return [];
+    node = node.children.get(char)!;
+  }
+  const matches: { word: string; popularity: number }[] = [];
+  this.collect(node, matches);
+  matches.sort((a, b) => b.popularity - a.popularity);
+  return matches.slice(0, n).map((m) => m.word);   // 只取前 N
+}
+```
+
+**做法 B：用大小為 N 的最小堆（Min-Heap）取前 N（k 遠大於 N 時更高效）**——維護一個只裝 N 個元素的最小堆：掃過每個匹配詞，若堆還沒滿就放入；若已滿且當前詞比堆頂（目前前 N 中最不熱門的）更熱門，就替換堆頂。最後堆裡就是前 N 名。
+
+```typescript
+// 假設有一個最小堆，以 popularity 為排序鍵（dsa-4-5）
+suggestTopN(prefix: string, n: number): string[] {
+  let node = this.root;
+  for (const char of prefix) {
+    if (!node.children.has(char)) return [];
+    node = node.children.get(char)!;
+  }
+  const matches: { word: string; popularity: number }[] = [];
+  this.collect(node, matches);
+
+  const heap = new MinHeap<{ word: string; popularity: number }>(
+    (a, b) => a.popularity - b.popularity,           // 最小堆：堆頂是最不熱門的
+  );
+  for (const m of matches) {
+    if (heap.size() < n) {
+      heap.push(m);
+    } else if (m.popularity > heap.peek()!.popularity) {
+      heap.pop();                                     // 踢掉目前前 N 裡最弱的
+      heap.push(m);
+    }
+  }
+  // 堆裡是前 N 名，但由小到大；倒過來成由熱到冷
+  return heap.toSortedArray().reverse().map((m) => m.word);
+}
+```
+
+**哪個好？** 看 k（匹配數）和 N 的關係：
+
+- 若 **k 不大、或幾乎都要回傳**（N 接近 k）→ **做法 A** 更簡單、常數更小，直接排序就好，別為了理論更快而增加複雜度（避免過早最佳化）。
+- 若 **k 很大但只要前少數幾名**（N ≪ k，例如上萬個匹配只取前 10）→ **做法 B** 明顯划算：不必把全部排好，只維護 N 個元素的堆。
+
+**第 2 題**：兩種做法的複雜度分析（k = 匹配數，N = 要取的名次數，P = 前綴長）。
+
+共同前段：走到前綴節點 O(P)、蒐集所有匹配 O(k × 詞長)。差別在「取前 N」這一步：
+
+- **做法 A（排序後切）**：排序整組是 **O(k log k)**，`slice` 是 O(N)。取前 N 部分主導為 **O(k log k)**。
+- **做法 B（大小 N 最小堆）**：掃 k 個元素、每個做至多一次 O(log N) 的堆操作 → **O(k log N)**，額外空間只有 O(N)。
+
+比較：因為 **N ≤ k**，所以 `log N ≤ log k`，做法 B 的 O(k log N) 在漸進上不劣於、且當 N ≪ k 時明顯優於 O(k log k)。這正是「反覆取最值 / 取前 N 名」聯想到堆積的價值（[dsa-4-5]）。
+
+**第 3 題**：以「**LRU 快取（Least Recently Used）**」示範用解題框架設計——
+
+- **① 理解需求**：一個固定容量的快取，支援 `get(key)` 和 `put(key, value)`；當容量滿了再放新項時，淘汰「**最久沒被使用**」的那一項。關鍵限制：`get` 和 `put` 都要 **O(1)**。
+- **② 從特徵聯想工具**：
+  - 「用 key 快速查 value、O(1)」→ **雜湊表 Map**（[dsa-3-3]）。
+  - 「要維護『使用先後順序』，且要能 O(1) 把某項移到最新、O(1) 移除最舊」→ **雙向鏈結串列**（[dsa-2-3]）。陣列做不到 O(1) 的中間移除，所以選鏈結串列；又因為要同時操作前後端與中間節點，選「雙向」。
+- **③④ 設計（組合兩個結構）**：
+  - **雙向鏈結串列**依「最近使用」排序：頭部＝最近用過，尾部＝最久沒用。
+  - **Map** 存 `key → 對應的鏈結串列節點`，讓我們能 O(1) 由 key 直接跳到節點。
+  - `get(key)`：用 Map 找到節點（O(1)）→ 把它移到串列頭（O(1)，因為是雙向、拿得到前後節點）→ 回傳值。
+  - `put(key, value)`：若已存在就更新並移到頭；若不存在就在頭部新增節點並寫入 Map；若超過容量，就刪掉串列尾節點、並從 Map 移除對應 key（都 O(1)）。
+- **⑤ 驗證**：測「容量為 1」「重複 put 同一 key」「淘汰後再 get 該 key 應 miss」「連續 get 改變淘汰順序」等邊界。
+
+一句話總結設計理由：**Map 提供 O(1) 定位、雙向鏈結串列提供 O(1) 調整順序與淘汰**——兩個結構各補對方的短處，合起來達成「兩個操作都 O(1)」的需求。這正是本專案示範的「多種資料結構各司其職、組合成完整方案」。
+
+</details>
+
 ## 課外讀物
 
 > 🎓 **恭喜你完成資料結構與演算法！** 你已經掌握了從複雜度分析、各種資料結構，到經典演算法策略，以及「拿到問題怎麼想」的完整能力。

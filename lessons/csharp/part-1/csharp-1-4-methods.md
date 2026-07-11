@@ -113,6 +113,69 @@ Console.WriteLine(Add("Hello, ", "C#")); // Hello, C#（用 string 版）
 2. 寫一個 `Greet` 方法，有預設參數 `greeting = "你好"`，呼叫時分別用預設值和具名參數各試一次。
 3. 為 `Multiply` 寫兩個多載：一個吃兩個 `int`、一個吃兩個 `double`，各測試。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：Square 與 PrintLine**
+
+`Square` 有回傳值（型別 `int`），`PrintLine` 只做事不回傳（型別 `void`），並用字串插值 `$"..."` 把訊息嵌進去、加上驚嘆號：
+
+```csharp
+int Square(int n)
+{
+    return n * n;
+}
+
+void PrintLine(string msg)
+{
+    Console.WriteLine($"{msg}!");   // 字串插值 + 驚嘆號
+}
+
+Console.WriteLine(Square(5));   // 25
+PrintLine("Hello");             // Hello!
+```
+
+重點對照：`Square` 回傳型別寫在最前面（`int`），`PrintLine` 因為不回傳所以寫 `void`。
+
+**練習 2：有預設參數的 Greet**
+
+`greeting = "你好"` 就是預設值；呼叫時可以「不給」（用預設）或「用具名參數指定」：
+
+```csharp
+void Greet(string name, string greeting = "你好")
+{
+    Console.WriteLine($"{greeting}，{name}");
+}
+
+Greet("Amy");                      // 用預設值 → 你好，Amy
+Greet("Bob", greeting: "早安");     // 具名參數 → 早安，Bob
+```
+
+具名參數（`greeting: "早安"`）的好處是「一眼看出這個引數是給哪個參數」，參數多的時候特別好讀。注意有預設值的參數要放在參數列後面。
+
+**練習 3：Multiply 的兩個多載**
+
+同名但參數型別不同，編譯器會依你傳的型別自動挑對的版本：
+
+```csharp
+int Multiply(int a, int b)
+{
+    return a * b;
+}
+
+double Multiply(double a, double b)   // 同名，參數型別不同
+{
+    return a * b;
+}
+
+Console.WriteLine(Multiply(3, 4));       // 12（用 int 版）
+Console.WriteLine(Multiply(1.5, 2.0));   // 3（用 double 版）
+```
+
+`Multiply(3, 4)` 兩個引數都是整數，編譯器選 int 版；`Multiply(1.5, 2.0)` 是小數，選 double 版。這就是多載——「概念上同一件事（相乘），但適用不同型別」共用一個直覺的名字。
+
+</details>
+
 ## 課外讀物
 
 > 函式設計原則（一個方法只做一件事、命名清楚）→ [課外讀物 E-6-3：函式的設計](../../../課外讀物/E-6-best-practices/E-6-3-function-design.md)、[課外讀物 E-7-2：單一職責](../../../課外讀物/E-7-solid/E-7-2-srp.md)

@@ -154,6 +154,22 @@ graph LR
 }
 ```
 
+<details>
+<summary>參考解答</summary>
+
+白話翻譯：「**允許**，對 `company-reports` 這個 bucket 裡的**所有物件**（`/*`），執行**讀取**（`s3:GetObject`）。」
+
+逐欄拆解：
+
+- `Version: "2012-10-17"` — 政策語言的固定版本，照填即可（不是日期）。
+- `Effect: "Allow"` — 這條規則是「允許」。
+- `Action: "s3:GetObject"` — 允許的動作是「讀取 S3 物件」，格式是 `服務:動作`（`s3` 服務的 `GetObject`）。它**只有讀**，沒有寫（`PutObject`）、沒有刪（`DeleteObject`）。
+- `Resource: "arn:aws:s3:::company-reports/*"` — 範圍限定在 `company-reports` 這**一個** bucket 底下的所有物件，不是所有 S3。
+
+一句話：這是一份「只能讀 `company-reports` 這個 bucket」的唯讀政策，範圍收得很乾淨，符合最小權限。
+
+</details>
+
 ---
 
 ### 練習 2：寫一份最小權限 Policy
@@ -161,6 +177,34 @@ graph LR
 寫一份政策：「**只能『讀取』（不能寫、不能刪）『public-images』這一個 bucket 的物件**」。
 
 > 提示：Effect=Allow、Action 只放 `s3:GetObject`、Resource 限定那個 bucket。
+
+<details>
+<summary>參考解答</summary>
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyPublicImages",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::public-images/*"
+    }
+  ]
+}
+```
+
+設計說明——每一處都在體現「剛好夠用」：
+
+- `Effect: "Allow"` — 我們要「允許」讀取。
+- `Action: "s3:GetObject"` — **只放讀取這一個動作**。題目要求「不能寫、不能刪」，所以刻意不放 `s3:PutObject`、`s3:DeleteObject`。沒列出的動作，靠「隱性拒絕」自動被擋。
+- `Resource: "arn:aws:s3:::public-images/*"` — 用 ARN 把範圍限定在 `public-images` 這**一個** bucket 底下的所有物件；`/*` 代表 bucket 裡的物件。絕不寫成 `"*"`（所有資源）。
+- `Sid` 是選填的名字，方便日後辨識，不寫也可以。
+
+如果動作只有一個，`Action` 寫成字串就好；未來要多加動作時再改成陣列，例如 `["s3:GetObject", "s3:PutObject"]`。
+
+</details>
 
 ---
 
@@ -174,6 +218,18 @@ B: { "Effect": "Allow", "Action": "s3:*", "Resource": "*" }
 ```
 
 > 提示：B 允許了「所有 S3 動作」對「所有資源」——這就是 2-2 說的危險全開。
+
+<details>
+<summary>參考解答</summary>
+
+**違反最小權限的是 B。**
+
+- **A**：`Action` 只有 `s3:GetObject`（唯讀），`Resource` 限定在 `my-bucket` 這一個 bucket。權限收得很緊、剛好夠用，符合最小權限。
+- **B**：`Action` 是 `s3:*`（**所有** S3 動作——讀、寫、刪、改權限全包），`Resource` 是 `"*"`（**所有** 資源，等於你帳號裡的每一個 bucket）。這等於把「整個 S3 的完整控制權」一次交出去。
+
+**為什麼 B 危險：** 這就是 2-2 講的「圖方便全開」。一旦持有這份政策的身份憑證外洩，或程式有 bug，攻擊者／錯誤程式就能對你**所有** bucket 做**任何**操作——刪光檔案、竄改內容、大量上傳灌爆容量。範圍越大，出事時的爆炸半徑越大。正確做法是像 A 那樣，把動作收到「剛好需要的那幾個」、把資源限定到「剛好那一個 bucket」。
+
+</details>
 
 ## 課外讀物
 

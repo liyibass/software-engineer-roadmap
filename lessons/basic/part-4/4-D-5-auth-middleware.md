@@ -197,6 +197,52 @@ create(request: Request, response: Response): void {
 
 **練習 3**：如果把 `requireAuth` 中介層裡的 `next()` 拿掉（驗證通過卻不呼叫 next），請求會發生什麼事？（提示：想想「放行」這個動作是誰觸發的。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1（動手題，需自行實機驗證）**
+
+先把 `requireAuth` 加到某個端點上，例如 `app.get("/todos", requireAuth, todoController.getAll)`。
+
+不帶 token 打（應回 401）：
+
+```bash
+curl -i http://localhost:3000/todos
+```
+
+驗收點：回應第一行是 `HTTP/1.1 401 Unauthorized`，body 是 `{"error":"請先登入"}`——因為中介層取不到 `Authorization` 標頭，直接擋下。
+
+帶上 token 的打法：用 `-H` 加一個 `Authorization: Bearer <token>` 標頭（`<token>` 換成你登入後拿到的真 token）：
+
+```bash
+curl -i http://localhost:3000/todos \
+  -H "Authorization: Bearer eyJhbGciOi...你的token"
+```
+
+驗收點：帶了有效 token 後改回 200 並拿到待辦資料。請自行實機驗證。
+
+**練習 2（動手觀察題，需自行實機驗證）**
+
+用一個格式不對的假 token 打：
+
+```bash
+curl -i http://localhost:3000/todos -H "Authorization: Bearer abc123"
+```
+
+會發生什麼：`abc123` 根本不是合法的 JWT（湊不出三段、簽章也對不上），所以 `jwt.verify(token, JWT_SECRET)` 會**丟出例外**（`JsonWebTokenError`）。而範例二用 `try / catch` 把這個例外接住，在 `catch` 裡回 `401` + `{"error":"登入已失效，請重新登入"}`。
+
+重點觀察：中介層不是自己一個個判斷「token 對不對」，而是**讓 `jwt.verify` 去 throw、再用 catch 統一轉成 401**——不管是亂打的、被竄改的、還是過期的 token，全都會走進 `catch`，一律回 401。請自行實機驗證。
+
+**練習 3**
+
+請求會**卡住（hang）**，永遠得不到回應，最後在瀏覽器／curl 端逾時。
+
+原因：在 Express 裡，一個中介層做完自己的事後，是靠**呼叫 `next()`** 來「放行、把棒子交給下一關」的。如果驗證通過卻不呼叫 `next()`，又沒有用 `response` 回任何東西，這個請求就停在 `requireAuth` 這一關——既沒有被往下傳到 Controller，也沒有被回應。對 Express 來說這個請求「還沒處理完」，於是它就一直懸著。
+
+換句話說，中介層每條路徑都必須有明確結局：**要嘛回應（`response.json()` / `.send()` 擋下），要嘛 `next()`（放行）**，兩者至少要有一個，否則請求就會被無聲地吞掉。這也解釋了為什麼「擋下」的分支裡我們 `return` 而不呼叫 `next()`（已經回應了，不能再往下走），而「放行」的分支要呼叫 `next()`。
+
+</details>
+
 ---
 
 ## 課外讀物

@@ -177,6 +177,40 @@ console.log(greeting + name)
 2. 把設定 JSON 複製進去，確認存檔後沒有出現錯誤
 3. 建立一個新的 `test.js` 檔案，隨便寫幾行縮排亂掉的程式碼，存檔後觀察 Prettier 有沒有自動整理
 
+<details>
+<summary>參考解答</summary>
+
+這三題都是動手操作，需要你在自己的 VS Code 裡實做，下面給正確做法與驗收檢查點，**最終仍需自行實機驗證**。
+
+**第 1 題：安裝四個延伸套件**
+
+按左側欄的 🧩 或 `Cmd + Shift + X` 打開套件市場，依序搜尋並安裝：`Prettier - Code formatter`、`ESLint`、`Error Lens`、`GitLens`。搜尋時記得認一下作者（例如 ESLint 是 Microsoft、Prettier 是 Prettier），避免裝到同名的仿冒套件。
+
+- **驗收檢查點**：把套件市場切到「INSTALLED（已安裝）」清單，四個套件都在裡面就成功了。
+
+**第 2 題：貼進設定 JSON**
+
+用 `Cmd + Shift + P` 輸入 `Open Settings (JSON)`，把課程給的那段設定貼進去。如果檔案原本已經有 `{ }`，就把設定內容放進大括號裡，**注意每個項目之間要有逗號、最後一項後面不要多逗號**（JSON 對逗號很嚴格）。
+
+- **驗收檢查點**：存檔後，如果 JSON 格式沒問題，畫面上不會出現紅色波浪線或錯誤提示。若有紅線，多半是逗號或引號漏掉了。
+
+**第 3 題：測試 Prettier**
+
+新增 `test.js`，故意寫得很亂，例如：
+
+```javascript
+const greeting="Hi"
+      const name=   'VSCode'
+console.log(greeting+name)
+```
+
+按 `Cmd + S` 存檔。
+
+- **驗收檢查點**：存檔的瞬間，縮排會被對齊成 2 個空格、引號會被統一、運算子兩邊會補上空格，變成整齊的樣子。
+- **如果沒反應**：檢查三件事——(1) `editor.formatOnSave` 有沒有設成 `true`；(2) `editor.defaultFormatter` 是不是 `esbenp.prettier-vscode`；(3) 右下角的語言模式是不是 JavaScript。也可以先手動按 `Opt + Shift + F` 測試 Prettier 本身有沒有作用。
+
+</details>
+
 ---
 
 ## 接下來

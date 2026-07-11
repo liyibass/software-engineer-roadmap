@@ -171,6 +171,20 @@ docker compose down
 1. 用 `docker run` 手動管理一套（app+db+cache）三個容器，有哪些麻煩？
 2. Docker Compose 怎麼解決這些麻煩？
 
+<details>
+<summary>參考解答</summary>
+
+1. **手動 `docker run` 三個容器的麻煩**：
+   - **指令又長又容易打錯**：每個容器的 `-e`、`-v`、`-p`、`--network`、`--name` 一大串參數，手打很容易漏或錯。
+   - **要記得先建網路**：容器要互連，得先 `docker network create` 再讓每個容器 `--network` 加進去，順序和名字都要對。
+   - **啟動順序有講究**：例如 app 依賴 db，得先確保 db 起來。
+   - **關閉要一個個 stop**：收攤時要逐一 `docker stop` / `docker rm`，容易漏掉。
+   - **難以重現**：那一大串指令通常只在你腦袋或某個筆記裡，換台機器就得整套重打一遍，超容易出錯。這正是「做一次很有感，做十次就該自動化」。
+
+2. **Docker Compose 怎麼解決**：把上面那一大串濃縮成**一個 `docker-compose.yml` 設定檔**，清楚寫下「有哪些服務、各自怎麼設定、彼此怎麼連」。然後用 `docker compose up`（一行全部啟動）、`docker compose down`（一行全部關閉）。它還會**自動幫你建好網路、依 `depends_on` 控制啟動順序**，你不用再手動 create network、不用記順序。設定寫進檔案還能進版控、複製到別台機器一鍵重現。用類比：`docker run` 是一個個點菜，Compose 是直接點一套套餐，一句話全部上齊。
+
+</details>
+
 ---
 
 ### 練習 2：看懂服務名連線
@@ -180,6 +194,15 @@ docker compose down
 1. 這個 `db` 是哪來的？
 2. 為什麼後端不用寫資料庫容器的 IP，直接寫 `db` 就能連到？
 
+<details>
+<summary>參考解答</summary>
+
+1. **`db` 就是你在 `docker-compose.yml` 裡取的服務名稱。** 看 yml 的 `services:` 底下，資料庫那段開頭就是 `db:`——這個名字是你自己命名的。你在 `app` 服務的 `DATABASE_URL` 裡寫的主機名 `db`，指的就是這個服務。（如果你把它改名叫 `database:`，那連線字串裡就要寫 `@database:5432`。）
+
+2. **因為 Docker Compose 自動幫你建了一個內部網路，並讓「服務名稱」自動解析到對應的容器。** Compose 啟動時會把這一套的所有服務放進同一個網路，並提供內部的名稱解析（DNS）——在這個網路裡喊 `db`，就會被解析到資料庫容器的（會變動的）IP。所以你**完全不用管 IP**，直接用服務名當主機名就通了。容器的 IP 每次重啟可能不同，但服務名永遠有效，這也是為什麼不該寫死 IP。這就是 Part 5-2 說的「容器用名字互相找」，Compose 把它自動化到極致、免費送你。
+
+</details>
+
 ---
 
 ### 練習 3：理解 down 與 down -v 的差別
@@ -188,6 +211,17 @@ docker compose down
 
 1. `docker compose down` 之後，資料庫的資料還在嗎？為什麼？
 2. 什麼情況你才會想用 `docker compose down -v`？用之前要先確認什麼？
+
+<details>
+<summary>參考解答</summary>
+
+1. **資料還在。** `docker compose down` 會停止並移除這套的所有**容器和網路**，但**預設會保留 volume**。資料庫的資料存在 volume（yml 裡的 `dbdata`）而不是容器內部，所以容器被砍掉了，資料仍安穩留在 volume 裡。下次 `docker compose up` 起來，新容器掛回同一個 `dbdata`，資料原封不動——這正是我們要的「容器可丟、資料要留」（呼應 Part 5-2 的 Volume）。
+
+2. **只有在你「真的想連資料一起清乾淨、從零開始」時才用 `docker compose down -v`。** 例如：本機開發時想重置成全新的資料庫、或這套只是測試環境要整個清掉。`-v` 會把 volume 也刪掉，**資料一去不回**。
+
+   **用之前一定要確認**：這個 volume 裡**沒有你捨不得的資料**——尤其**千萬別在正式（production）環境對著真實資料庫下 `-v`**，那等於把使用者資料整個刪光，是真實世界的重大事故。保險做法：先確認自己在哪個環境、先備份，再決定要不要加 `-v`。
+
+</details>
 
 > 提示：這跟 Part 5-2 的 Volume「容器可丟、資料要留」是同一個道理。搞錯這個，可能把正式資料庫的資料整個刪掉——這是真實世界的重大事故。
 

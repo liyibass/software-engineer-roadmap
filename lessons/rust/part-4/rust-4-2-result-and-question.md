@@ -116,6 +116,70 @@ fn first_char_upper(s: &str) -> Option<char> {
 2. 把練習 1 改成「`main` 也回傳 `Result`」的寫法，在 `main` 裡用 `?` 呼叫它。
 3. 用 `Option` 版的 `?` 寫一個 `fn second_char(s: &str) -> Option<char>`，回傳第二個字元（沒有就 `None`）。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：`parse_and_double`**
+
+```rust
+fn parse_and_double(s: &str) -> Result<i32, std::num::ParseIntError> {
+    let n = s.parse::<i32>()?;   // 失敗就自動 return 這個 Err
+    Ok(n * 2)
+}
+
+fn main() {
+    match parse_and_double("21") {
+        Ok(n) => println!("兩倍是 {}", n),
+        Err(e) => println!("出錯：{}", e),
+    }
+
+    match parse_and_double("abc") {
+        Ok(n) => println!("兩倍是 {}", n),
+        Err(e) => println!("出錯：{}", e),
+    }
+}
+```
+
+`"21"` 會印出 `兩倍是 42`；`"abc"` 會走 `Err`，印出 `出錯：invalid digit found in string`。這裡函式的錯誤型別直接宣告成 `std::num::ParseIntError`——剛好就是 `parse` 失敗時給的錯誤型別，所以 `?` 不需要任何轉換就能把錯誤原封不動往上傳。
+
+**練習 2：讓 `main` 也回傳 `Result`**
+
+```rust
+fn parse_and_double(s: &str) -> Result<i32, std::num::ParseIntError> {
+    let n = s.parse::<i32>()?;
+    Ok(n * 2)
+}
+
+fn main() -> Result<(), std::num::ParseIntError> {
+    let n = parse_and_double("21")?;   // 在 main 裡也能用 ? 了
+    println!("兩倍是 {}", n);
+    Ok(())
+}
+```
+
+因為 `main` 現在回傳 `Result<(), std::num::ParseIntError>`，`?` 就有地方可以 `return Err` 了。如果把 `"21"` 換成 `"abc"`，`?` 會讓 `main` 提早回傳 `Err`，程式會把錯誤印出來並以非零狀態碼結束（代表「這次執行失敗了」）。注意 `main` 的錯誤型別要跟 `parse_and_double` 相容，`?` 才會通過。
+
+**練習 3：`Option` 版的 `?`**
+
+```rust
+fn second_char(s: &str) -> Option<char> {
+    let mut chars = s.chars();
+    chars.next()?;              // 先跳過第一個字元；沒有就直接回傳 None
+    let second = chars.next()?; // 再取第二個；沒有一樣回傳 None
+    Some(second)
+}
+
+fn main() {
+    println!("{:?}", second_char("hello")); // Some('e')
+    println!("{:?}", second_char("h"));      // None（只有一個字元）
+    println!("{:?}", second_char(""));       // None（空字串）
+}
+```
+
+`s.chars()` 會給我們一個逐字元的迭代器。第一次 `chars.next()?` 拿走第一個字元——我們不需要它的值，但用 `?` 可以順便處理「空字串」的情況（`None` 就直接回傳 `None`）。第二次 `chars.next()?` 才是我們要的第二個字元，一樣沒有就回傳 `None`。全部都有值時包成 `Some(second)` 回傳。可以看到 `?` 用在 `Option` 上時，邏輯是「遇到 `None` 就提早回傳 `None`」，讓程式一樣筆直好讀。
+
+</details>
+
 ## 課外讀物
 
 > 「巢狀地獄」是可讀性反模式，`?` 正是 Rust 對它的解藥 → [課外讀物 E-6-6：程式碼異味與反模式](../../../課外讀物/E-6-best-practices/E-6-6-anti-patterns.md)

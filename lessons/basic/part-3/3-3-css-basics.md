@@ -341,6 +341,95 @@ Flexbox 最常見的用途之一是「水平 + 垂直同時置中」，寫法固
 
 **練習 1**：在你的 Todo App 裡加上一個「空狀態」提示。當清單是空的時，在 `<ul>` 裡面加一行 `<p class="empty-hint">還沒有任何待辦事項</p>`，然後用 CSS 讓這行字顯示為灰色（`color: #999`）、斜體（`font-style: italic`）、水平置中（`text-align: center`）。
 
+<details>
+<summary>參考解答</summary>
+
+先在 HTML 的 `<ul id="todo-list">` 裡放一行提示文字：
+
+```html
+<ul id="todo-list">
+  <p class="empty-hint">還沒有任何待辦事項</p>
+</ul>
+```
+
+再到 `style.css` 加上 `.empty-hint` 這個 class 選擇器的樣式：
+
+```css
+.empty-hint {
+  color: #999;            /* 灰色，弱化這行提示 */
+  font-style: italic;     /* 斜體 */
+  text-align: center;     /* 文字水平置中 */
+  padding: 12px 0;        /* 上下留一點空間，不會擠在一起（非必需，但更好看） */
+}
+```
+
+說明：這裡用 **class 選擇器**（`.empty-hint`）而不是標籤選擇器，因為我們只想影響這一行提示，不想影響頁面上其他的 `<p>`。三個屬性各自對應題目要求：`color` 改顏色、`font-style: italic` 變斜體、`text-align: center` 讓文字置中。
+
+**請自行實機驗證**：重新整理頁面，這行字應該呈現灰色、斜體、置中的樣子。
+
+</details>
+
 **練習 2**：修改 `.input-area button` 的樣式，讓按鈕的背景色從藍色改成你喜歡的顏色。然後用 `border-radius: 999px` 把它改成膠囊形狀（完全圓角），觀察效果。
 
+<details>
+<summary>參考解答</summary>
+
+修改 `.input-area button` 的 `background-color` 和 `border-radius`：
+
+```css
+.input-area button {
+  padding: 10px 20px;
+  background-color: #2ecc71;  /* 換成你喜歡的顏色，這裡示範改成綠色 */
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;       /* 超大圓角 → 上下邊被完全磨圓，變成膠囊形狀 */
+  font-size: 15px;
+  cursor: pointer;
+}
+```
+
+說明：
+
+- `background-color` 你可以填任何 CSS 顏色——顏色名稱（`green`）、十六進位（`#2ecc71`）、或 `rgb(46, 204, 113)` 都可以。
+- 為什麼 `border-radius: 999px` 會變膠囊？`border-radius` 是「圓角半徑」，當半徑大於元素高度的一半時，上下兩邊就被完全磨成半圓，於是整顆按鈕看起來像藥丸/膠囊。用一個誇張的大數字（999px）是常見小技巧，保證不管按鈕多高都會是完整的膠囊形。
+
+**請自行實機驗證**：重新整理後，按鈕應該是你選的顏色，且兩端呈半圓形。記得順手也把 `:hover` 的顏色改成同色系的深一點版本，hover 時才協調。
+
+</details>
+
 **練習 3**：在 `#todo-list li` 加上 `display: flex` 和 `justify-content: space-between`，然後在每個 `<li>` 裡加一個 `<span>刪除</span>`，讓「待辦文字」和「刪除」分別貼在左右兩端。（還不用讓按鈕真的能刪除——那是下一章的事。）
+
+<details>
+<summary>參考解答</summary>
+
+HTML 部分，在每個 `<li>` 裡把文字和「刪除」分成兩塊（用 `<span>` 包住，方便左右分開）：
+
+```html
+<ul id="todo-list">
+  <li><span>買牛奶</span><span>刪除</span></li>
+  <li><span>寫作業</span><span>刪除</span></li>
+</ul>
+```
+
+CSS 部分，在 `#todo-list li` 加上 Flexbox：
+
+```css
+#todo-list li {
+  display: flex;                   /* 讓 li 的子元素排成一排 */
+  justify-content: space-between;  /* 兩端對齊：第一個貼左、最後一個貼右 */
+  align-items: center;             /* 垂直置中對齊，兩塊文字同高（非必需但更整齊） */
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 15px;
+}
+```
+
+說明：
+
+- `display: flex` 一下，`<li>` 裡的兩個 `<span>` 就從「上下堆疊」變成「左右並排」。
+- `justify-content: space-between` 是關鍵——它把剩餘空間全部塞到兩塊元素**中間**，於是待辦文字被推到最左、「刪除」被推到最右，正好符合題目要的效果。
+- 這正是本章「範例三」裡輸入區 `.input-area` 用 Flexbox 排版的同一招，換個場景再練一次。
+
+**請自行實機驗證**：重新整理後，每一行的待辦文字在左、「刪除」在右。（此時「刪除」只是文字，還不能真的刪東西，那要等 3-4 章加上 JavaScript。）
+
+</details>

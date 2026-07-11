@@ -128,6 +128,68 @@ public class TodoService
 2. 在 `Program.cs` 註冊 `AppDbContext`，連線字串放 `appsettings.json`（密碼先放佔位符，提醒自己之後要走環境變數）。
 3. 思考題：為什麼 DbContext 該註冊成「Scoped」（每個請求一個）而非 Singleton？（提示：呼應 csharp-4-4、cs Part 5-2 請求隔離。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：定義 `Product` 實體並加到 `AppDbContext`**
+
+實體就是個普通 class，`Id` 依慣例自動成為主鍵；再在 DbContext 加一個對應的 `DbSet`：
+
+```csharp
+public class Product
+{
+    public int Id { get; set; }            // 慣例：Id 自動成為主鍵
+    public string Name { get; set; } = "";
+    public decimal Price { get; set; }     // 金額用 decimal，別用 double（避免浮點誤差）
+}
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+        : base(options) { }
+
+    public DbSet<TodoItem> Todos => Set<TodoItem>();
+    public DbSet<Product> Products => Set<Product>();   // 新增這行
+}
+```
+
+小提醒：價格用 `decimal` 而非 `double`——金額計算要精確，浮點數（`double`）會有捨入誤差，這在處理錢的時候是不能接受的。
+
+**第 2 題：在 `Program.cs` 註冊、連線字串放 `appsettings.json`**
+
+```csharp
+// === Program.cs ===
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    ));
+```
+
+```json
+// === appsettings.json ===
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Database=mydb;Username=myuser;Password=__放環境變數__"
+  }
+}
+```
+
+密碼這裡先放個明顯的佔位符（`__放環境變數__`）提醒自己：真正的密碼絕不寫死在 `appsettings.json`、也不進 Git，正式上線要走環境變數或 User Secrets（csharp-4-5、csharp-9-3）。實際跑起來時，可以用環境變數 `ConnectionStrings__DefaultConnection` 覆蓋整段連線字串，或在連線字串裡只把 `Password` 那段從環境變數組進去。
+
+> 需自行實機驗證：這題請在自己專案跑一次 `dotnet run`，確認 App 能正常啟動、沒有噴連線設定相關的錯誤（此時還沒 Migration，只要 App 起得來即可）。
+
+**第 3 題（思考題）：為什麼 DbContext 要 Scoped 而非 Singleton？**
+
+關鍵在於 **DbContext 不是執行緒安全的，而且它會「追蹤變更」帶有狀態**：
+
+1. **請求隔離**：Scoped 代表「每個 HTTP 請求拿到一個全新的 DbContext」。A 使用者的請求和 B 使用者的請求各自有獨立的 context，A 暫存未存檔的變更不會混到 B 身上（呼應 cs Part 5-2 的請求隔離）。
+2. **執行緒安全**：Web 伺服器同時處理很多請求（多執行緒）。DbContext 不是 thread-safe，若做成 Singleton，多個請求共用同一個 context 併發存取，就會出現變更追蹤錯亂、甚至例外。
+3. **變更追蹤會累積**：DbContext 會一直記著你查過、改過的物件。Singleton 的話這些追蹤狀態永遠不釋放，越積越多——既吃記憶體，也讓不同請求互相污染。
+
+所以正確做法是 Scoped：每個請求開一個、請求結束就丟掉。而 `AddDbContext` 預設註冊的生命週期剛好就是 Scoped，不用你自己特別指定。
+
+</details>
+
 ## 課外讀物
 
 > 主鍵、資料表、關聯式模型 → **cs 課程 Part 7-3**、[課外讀物 E-4](../../../課外讀物/E-4-database/E-4-1-what-is-index.md)

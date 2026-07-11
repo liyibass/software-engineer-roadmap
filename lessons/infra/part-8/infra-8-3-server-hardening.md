@@ -132,6 +132,22 @@ sudo systemctl restart fail2ban
 
 對照本章開頭的表格，列出你在 Part 2-6、3-3 已經做過的加固項目。你會發現自己其實已經做了不少——這一章只是補完。
 
+<details>
+<summary>參考解答</summary>
+
+對照本章表格，你在前面幾章其實已經做了不少加固——每一項都在**縮小攻擊面**：
+
+| 已完成的加固 | 在哪學的 | 縮小了什麼攻擊面 |
+|------------|---------|----------------|
+| 不用 root，改用一般使用者 + `sudo` | Part 2-6 | 就算帳號被攻破，攻擊者也不是直接拿到最高權限；`sudo` 還留下操作紀錄 |
+| 改用金鑰登入、關閉密碼登入 | Part 2-6 | 機器人猜密碼再也沒用——沒有你的私鑰就進不來，直接堵死「暴力破解密碼」這條路 |
+| 禁止 root 直接 SSH 登入 | Part 2-6 | 攻擊者連「要猜哪個帳號」都不知道，不能直接對人人皆知的 `root` 下手 |
+| 防火牆只開必要 port（例如 22 / 80 / 443） | Part 3-3 | 沒開的 port 一律拒絕連線，把「可下手的入口」縮到最少 |
+
+把這些對照本章開頭那張「大攻擊面 → 小攻擊面」的圖，你會發現「金鑰登入、root 不可登入、只開必要服務」這幾點你早就做到了。這一章的三招（關閉沒用的服務、自動安全更新、fail2ban）只是把剩下的缺口補完——加固不是一次工程，而是一路累積下來的習慣。
+
+</details>
+
 ---
 
 ### 練習 2：看看你被攻擊得多兇
@@ -145,6 +161,40 @@ sudo fail2ban-client status sshd
 
 第一行數有多少次失敗登入嘗試，第二行看 fail2ban 擋了多少。感受一下「公開伺服器無時無刻被攻擊」是真的。
 
+<details>
+<summary>參考解答</summary>
+
+> 這題要在你自己對外的 EC2 上跑才有意義（WSL 不對外，數字會是 0），需自行實機驗證。以下解釋每行在做什麼、你會看到什麼。
+
+**第一行——數失敗登入次數：**
+
+```bash
+sudo grep "Failed password" /var/log/auth.log | wc -l
+```
+
+- `grep "Failed password" /var/log/auth.log`——從 SSH 的驗證日誌裡撈出所有「密碼登入失敗」的紀錄（Part 7-1 學的）。
+- `| wc -l`——把撈出來的行數數一數（`wc -l` = word count 的 line 模式，算行數）。
+
+一台開著幾天的公開 EC2，這個數字常常是**成百上千甚至上萬**——那全是全世界的機器人在猜你的密碼。第一次看到會有點嚇到，但這正是本章開頭說的：任何有公開 IP 的機器，上線幾分鐘內就開始被掃。（順帶一提，因為你早就關掉密碼登入、只用金鑰，這些猜密碼的嘗試**注定失敗**，進不來。）
+
+> 小提醒：有些系統的日誌會輪替（logrotate），舊紀錄跑到 `/var/log/auth.log.1`、`auth.log.2.gz` 去了。想連舊的一起數，可以用 `sudo zgrep "Failed password" /var/log/auth.log*`。
+
+**第二行——看 fail2ban 擋了多少：**
+
+```bash
+sudo fail2ban-client status sshd
+```
+
+會顯示 SSH 這個「監獄（jail）」的狀態，重點看幾個數字：
+
+- `Total failed`——累計偵測到多少次失敗嘗試。
+- `Currently banned` / `Total banned`——目前正被封鎖、以及累計封鎖過多少個 IP。
+- `Banned IP list`——目前被關在門外的 IP 清單。
+
+把兩個數字擺在一起看，你就能實際感受到：攻擊是**持續不斷**的（第一行的大數字），而 fail2ban 正默默幫你把那些一直試錯的 IP 擋在門外（第二行）。這就是「請了一個保全」的效果。
+
+</details>
+
 ---
 
 ### 練習 3：完成三招加固
@@ -152,6 +202,66 @@ sudo fail2ban-client status sshd
 在你的 EC2 上完成：關閉一個沒用的服務（如果有）、開啟自動安全更新、裝好 fail2ban。完成後，你的伺服器攻擊面就縮到很小了。
 
 > 提示：加固不是一次做完就結束，而是持續的習慣。但你現在已經把「最關鍵的幾道防線」都建立起來了。
+
+<details>
+<summary>參考解答</summary>
+
+> 這題是動手題，要在你自己的 EC2 上實作，需自行實機驗證。以下給三招的完整步驟與驗收點。
+
+**第一招：關閉一個沒用的服務（如果有）**
+
+先盤點目前開了哪些 port、聽著哪些服務：
+
+```bash
+sudo ss -tlnp
+```
+
+看清單裡有沒有你**用不到**卻在聽的服務（例如某個當初隨手裝、現在沒在用的東西）。有的話就停掉並取消開機自啟：
+
+```bash
+sudo systemctl disable --now 服務名
+```
+
+`disable --now` = 立刻停止 + 取消開機自啟。**驗收點**：再跑一次 `sudo ss -tlnp`，那個 port 應該不見了。（如果盤點下來每個服務都是必要的，例如只剩 SSH 和 Nginx，那這招就「不用關」——這也是正確結果，代表你的攻擊面本來就很乾淨。）
+
+**第二招：開啟自動安全更新**
+
+```bash
+sudo apt update
+sudo apt install unattended-upgrades -y
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+```
+
+最後一行會跳出設定畫面，選 **Yes** 啟用。**驗收點**：確認 `/etc/apt/apt.conf.d/20auto-upgrades` 這個檔存在且內容把自動更新設為 `"1"`：
+
+```bash
+cat /etc/apt/apt.conf.d/20auto-upgrades
+```
+
+**第三招：裝好 fail2ban**
+
+```bash
+sudo apt install fail2ban -y
+```
+
+裝好後預設就會保護 SSH。**驗收點**：確認服務有在跑、且 sshd 這個 jail 是 active 的：
+
+```bash
+sudo systemctl status fail2ban          # 應該是 active (running)
+sudo fail2ban-client status sshd        # 能看到 sshd jail 的封鎖統計
+```
+
+（選配）若要調封鎖規則，複製設定檔再改，**不要直接改原始的 `jail.conf`**——用 `.local` 覆蓋是 fail2ban 的慣例，套件更新時才不會蓋掉你的設定：
+
+```bash
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+sudo vi /etc/fail2ban/jail.local        # 調 maxretry、bantime 等
+sudo systemctl restart fail2ban
+```
+
+三招都完成後，加上你 Part 2-6、3-3 早就做過的（金鑰登入、關密碼、防火牆），你的伺服器攻擊面就縮到很小了。記住：加固是**持續的習慣**，不是一次做完就結束——但最關鍵的幾道防線，你現在已經都建立起來了。
+
+</details>
 
 ## 課外讀物
 

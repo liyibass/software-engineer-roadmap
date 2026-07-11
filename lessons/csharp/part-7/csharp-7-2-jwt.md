@@ -158,6 +158,67 @@ public IActionResult Login(...) { ... }
 2. 說出 JWT 的三個部分，並解釋為什麼「Payload 不能放敏感資料」。
 3. 為一個端點加 `[Authorize]`，不帶 token 呼叫看是否回 401，帶有效 token 看是否成功。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用電子票比喻解釋 JWT 與無狀態**
+
+流程對應：
+
+- **登入 ＝ 買票**：你出示帳密（付錢），主辦方（伺服器）確認無誤後，發給你一張電子票（JWT）。
+- **票面資訊 ＝ Payload**：票上印著你是誰、坐哪區（你的角色、權限），還有一個**防偽簽章**（Signature）。
+- **每次進場出示票 ＝ 每個請求帶著 JWT**（放在 `Authorization: Bearer xxx` 標頭）。
+- **驗票 ＝ 驗簽章**：驗票員只要用主辦方的驗證方式檢查簽章對不對，就知道票是不是真的、有沒有被竄改。
+
+**為什麼不用打電話回主辦方（無狀態）**：簽章是用「伺服器的祕密金鑰」簽出來的，**驗票員手上就有驗證這個簽章的能力**，不需要連回主辦方的資料庫查「這張票存在嗎」。只要簽章驗得過、沒過期，就代表這張票是主辦方真的發出、內容沒被改過的。伺服器不需要為每個人保存一份 session 記錄——這就是「無狀態」，也讓多台伺服器都能各自驗票，容易水平擴展。
+
+**第 2 題：JWT 三個部分，以及為什麼 Payload 不能放敏感資料**
+
+三個部分（用 `.` 隔開，`Header.Payload.Signature`）：
+
+1. **Header（標頭）**：說明用什麼演算法簽章（如 HS256）。
+2. **Payload（內容）**：放「聲明（claims）」——你是誰、角色、過期時間（exp）等。
+3. **Signature（簽章）**：用祕密金鑰對前兩部分簽出來的防偽章，用來驗真偽與防竄改。
+
+**為什麼 Payload 不能放敏感資料**：Payload 只是做了 **Base64Url 編碼，並沒有加密**。編碼是「可逆的排版轉換」，不是「加密」——任何人（包括客戶端、傳輸途中攔到 token 的人）只要把中間那段拿去 Base64 解碼，就能明文讀到裡面全部內容。簽章只保證「內容沒被改」，不保證「內容看不到」。所以像密碼、身分證號、信用卡號這種敏感資料**絕對不能放進 Payload**，否則等於公開。
+
+**第 3 題：加 `[Authorize]` 測試 401 / 成功**（需自行實機驗證）
+
+做法：
+
+```csharp
+[Authorize]
+[HttpGet("api/secret")]
+public IActionResult GetSecret() => Ok("這是受保護的內容");
+```
+
+測試步驟（用 curl 或 Postman）：
+
+```bash
+# 1. 不帶 token → 預期 401 Unauthorized
+curl -i http://localhost:5000/api/secret
+
+# 2. 先登入拿 token
+curl -i -X POST http://localhost:5000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"amy","password":"pass1234"}'
+# 從回應取出 token 字串
+
+# 3. 帶有效 token → 預期 200 OK + 內容
+curl -i http://localhost:5000/api/secret \
+  -H "Authorization: Bearer <貼上剛剛的 token>"
+```
+
+驗收點：
+
+- 不帶 token（或帶亂填的 token）→ 回 **401 Unauthorized**。
+- 帶登入拿到的有效 token → 回 **200 OK**，看到「這是受保護的內容」。
+- （加分）把 token 過期時間調短測過期，或改動 token 中間任一字元再打，都應被擋成 401——驗證簽章與過期檢查真的有生效。
+
+> 這需要實際把專案跑起來、發送請求觀察狀態碼，請自行在本機實機驗證。
+
+</details>
+
 ## 課外讀物
 
 > JWT、密碼儲存、Web 安全 → [課外讀物 E-10：Web Security](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)、[課外讀物 E-10-6：密碼儲存](../../../課外讀物/E-10-security/E-10-6-password-storage.md)

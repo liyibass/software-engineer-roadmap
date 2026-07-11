@@ -115,6 +115,55 @@ fn main() {
 2. 寫一個函式 `fn shout(s: &str) -> String`，回傳「`s` 加上三個驚嘆號」的新字串。注意參數收 `&str`、回傳 `String`，想想為什麼這樣設計合理。
 3. 把一個字面值、一個 `String`、一個切片都傳給練習 2 的函式（記得 `String` 要傳 `&`），確認都能用。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**：`String` 才能增長，所以要 `mut`。`push_str` 接一整段字串（`&str`），`push` 接單一字元（`char`，用單引號）。
+
+```rust
+fn main() {
+    let mut s = String::from("Rust");
+    s.push_str(" 很有趣"); // 接一段字串
+    s.push('!');           // 接一個字元（單引號）
+    println!("{}", s);     // Rust 很有趣!
+}
+```
+
+小提醒：`push` 收的是 `char`（單引號 `'!'`），`push_str` 收的是 `&str`（雙引號 `" 很有趣"`），別搞混。
+
+**練習 2**：參數收 `&str` 是因為它最通用——字面值、切片、`String` 都能接（`String` 會自動轉成 `&str`）。回傳 `String` 是因為我們「組出一個新字串」，必須擁有它才能回傳出去（不能回傳借用一個函式內部就消失的東西）。
+
+```rust
+fn shout(s: &str) -> String {
+    // format! 產生一個新的、擁有的 String
+    format!("{}!!!", s)
+}
+
+fn main() {
+    println!("{}", shout("Hello")); // Hello!!!
+}
+```
+
+為什麼這樣設計合理：**「只是要讀進來的東西 → 收 `&str`；要交出去的新東西 → 回傳 `String`」**，這正是本章的黃金法則。`format!` 幫我們配置堆積、組出新字串並擁有它。
+
+**練習 3**：三種來源都能傳進 `shout`，關鍵是 `String` 要加 `&` 借用成 `&str`。
+
+```rust
+fn main() {
+    let literal = "字面值";                 // &str
+    let owned = String::from("String 字串"); // String
+    let slice = &owned[0..6];               // 從 String 切出的 &str（前兩個中文字，各佔 3 位元組）
+
+    println!("{}", shout(literal)); // ✅ 直接就是 &str
+    println!("{}", shout(&owned));  // ✅ String 加 & 自動轉 &str
+    println!("{}", shout(slice));   // ✅ 切片本來就是 &str
+}
+```
+
+驗收點：三行都能編譯、都印得出來。這就證明了「參數收 `&str` 最通用」——一個函式同時接住了字面值、`String` 和切片三種來源，不必為每種各寫一個版本。
+
+</details>
+
 ## 課外讀物
 
 > `&str` 就是字串切片，本質是「借用一段連續資料」 → 複習 [rust-2-7]；擁有 vs 借用 → [rust-2-5]

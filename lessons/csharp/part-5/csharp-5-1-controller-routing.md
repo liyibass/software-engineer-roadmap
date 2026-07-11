@@ -108,6 +108,58 @@ public IActionResult Create([FromBody] CreateUserDto dto) { ... }
 2. 加一個 `[HttpGet]` 的 Action 用 `[FromQuery]` 接收 `page` 參數，回傳「第 X 頁」。
 3. 思考題：路由 `[HttpGet("{id}")]` 裡的 `{id}` 怎麼對應到 Action 的參數？這和 rust 課程 [rust-9-3] 的 `Path` 提取器有什麼相似？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：一個基本的 `ProductsController`。重點是 `[ApiController]` + `[Route("api/products")]` 標在 class 上，兩個 GET Action 分別用 `[HttpGet]` 和 `[HttpGet("{id}")]` 區分「列表」和「查單一」。
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/products")]
+public class ProductsController : ControllerBase
+{
+    // GET /api/products → 回傳商品陣列
+    [HttpGet]
+    public IActionResult GetAll()
+    {
+        var products = new[] { "鍵盤", "滑鼠", "螢幕" };
+        return Ok(products);            // 200 OK + JSON 陣列
+    }
+
+    // GET /api/products/5 → 查單一商品
+    [HttpGet("{id}")]
+    public IActionResult GetById(int id)
+    {
+        if (id < 1)
+            return BadRequest("id 必須大於 0");   // 400
+        return Ok($"商品 {id}");                 // 200
+    }
+}
+```
+
+驗收點：`dotnet run` 後開 `/swagger`，會看到 `GET /api/products` 和 `GET /api/products/{id}` 兩個端點。前者回傳陣列，後者輸入一個 id 回傳單一結果。**這步需要你自己實機跑起來驗證畫面。**
+
+**第 2 題**：多加一個接收 `[FromQuery]` 參數的 Action。注意這裡讓它用不同的子路徑（例如 `paged`）避免和上面無參數的 `GetAll` 路由衝突——同一個 Controller 裡兩個都標 `[HttpGet]`、又都沒有額外路徑的話，框架會分不清該進哪一個。
+
+```csharp
+// GET /api/products/paged?page=2 → 回傳「第 2 頁」
+[HttpGet("paged")]
+public IActionResult ListByPage([FromQuery] int page)
+{
+    return Ok($"第 {page} 頁");
+}
+```
+
+驗收點：在 Swagger 呼叫 `GET /api/products/paged?page=2`，回傳「第 2 頁」。試試不帶 `page`（會是預設值 0），感受 `[FromQuery]` 是「從網址查詢字串取值」。**需自行實機驗證。**
+
+**第 3 題（思考題）**：路由範本 `[HttpGet("{id}")]` 裡的 `{id}` 是一個「路由參數佔位符」。當請求 `/api/products/5` 進來，框架的**路由比對**發現 `5` 落在 `{id}` 的位置，就把字串 `"5"` 抓出來；接著 **Model Binding** 依「名字相同」的規則，把它綁到 Action 參數 `int id` 上，並自動把字串轉成 `int`（轉不動就回 400）。關鍵是**名字要一樣**——範本裡叫 `{id}`，參數就要叫 `id`。
+
+和 rust [rust-9-3] 的 `Path` 提取器非常像：Axum 用 `Path(id): Path<u32>` 從網址路徑抽出 `id` 並轉成 `u32`，Rust 是「用型別 + 提取器」明確宣告要抽什麼；ASP.NET Core 則是「用路由範本的 `{名字}` 對應同名參數」隱式綁定。兩者精神一致——**框架幫你把網址裡的片段解析、轉型成型別安全的參數，你不用自己去 split 字串**。
+
+</details>
+
 ## 課外讀物
 
 > 對照其他框架的路由/handler → **basic 課程 Part 4**、**rust 課程 [rust-9-2]、[rust-9-3]**

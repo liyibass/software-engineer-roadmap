@@ -138,6 +138,112 @@ graph TB
 2. 讓一個 class 同時實作兩個介面（如 `IShape` 和 `IComparable`），體會介面能多重實作。
 3. 思考題：「資料庫存取」該定義成「介面 `IUserRepository`」還是「抽象類別」？為什麼（提示：想測試、想換實作）？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：定義 `IShape`，`Circle`、`Rectangle` 實作，寫 `PrintArea`**
+
+介面只定義「能做什麼」的合約（`double Area()`），實作 class 承諾把它做出來。`PrintArea` 只依賴介面，不管實際是哪種形狀：
+
+```csharp
+interface IShape
+{
+    double Area();
+}
+
+class Circle : IShape
+{
+    public double Radius { get; }
+    public Circle(double radius) => Radius = radius;
+
+    public double Area() => Math.PI * Radius * Radius;
+}
+
+class Rectangle : IShape
+{
+    public double Width { get; }
+    public double Height { get; }
+    public Rectangle(double width, double height)
+    {
+        Width = width;
+        Height = height;
+    }
+
+    public double Area() => Width * Height;
+}
+
+// 只認「IShape 這個能力」，收任何形狀
+void PrintArea(IShape shape)
+{
+    Console.WriteLine($"面積 = {shape.Area():F2}");
+}
+
+PrintArea(new Circle(5));         // 面積 = 78.54
+PrintArea(new Rectangle(3, 4));   // 面積 = 12.00
+```
+
+未來新增 `Triangle : IShape`，`PrintArea` 完全不用改——這就是「依賴能力而非具體實作」。
+
+**第 2 題：一個 class 同時實作兩個介面**
+
+C# 只能繼承一個父類別，但能實作多個介面——用逗號隔開即可。這裡讓 `Rectangle` 同時實作 `IShape` 和內建的 `IComparable<Rectangle>`（可依面積排序）：
+
+```csharp
+class Rectangle : IShape, IComparable<Rectangle>
+{
+    public double Width { get; }
+    public double Height { get; }
+    public Rectangle(double width, double height)
+    {
+        Width = width;
+        Height = height;
+    }
+
+    public double Area() => Width * Height;               // 來自 IShape
+
+    public int CompareTo(Rectangle? other)                // 來自 IComparable<Rectangle>
+    {
+        if (other is null) return 1;
+        return Area().CompareTo(other.Area());            // 依面積比大小
+    }
+}
+
+var list = new List<Rectangle>
+{
+    new Rectangle(3, 4),   // 面積 12
+    new Rectangle(1, 2),   // 面積 2
+    new Rectangle(5, 5),   // 面積 25
+};
+list.Sort();               // 因為實作了 IComparable，Sort() 就知道怎麼排
+foreach (var r in list)
+    Console.WriteLine(r.Area());   // 2, 12, 25（由小到大）
+```
+
+因為 `Rectangle` 同時是 `IShape`（能算面積）又是 `IComparable`（能比大小），所以既能傳給 `PrintArea`，又能直接被 `List.Sort()` 排序——這是介面勝過繼承的地方。
+
+**第 3 題（思考題）：「資料庫存取」用介面還是抽象類別？**
+
+**用介面 `IUserRepository`。**
+
+理由是「資料庫存取」的重點是「**能做什麼**」（能存、能查、能刪），而不是「一群類別共用的實作」：
+
+```csharp
+interface IUserRepository
+{
+    User? GetById(int id);
+    void Save(User user);
+}
+```
+
+用介面的兩大好處正好對應提示：
+
+1. **想換實作**：正式環境用 `SqlUserRepository : IUserRepository`（連真的資料庫），未來要換成 MongoDB 只要寫 `MongoUserRepository : IUserRepository`，依賴它的程式碼一行都不用改。
+2. **想測試**：測試時可以給一個 `FakeUserRepository : IUserRepository`（用記憶體裡的 List 假裝資料庫），不用真的連資料庫就能快速測 → 這正是 [csharp-8-2] 的 mock。
+
+抽象類別適合「一群類別有大量共用實作、且是強 is-a 關係」的情況；而 repository 各實作之間（SQL vs Mongo）幾乎沒有共用邏輯，強行用抽象類別反而綁手綁腳。這也是為什麼 ASP.NET Core 的依賴注入（[csharp-4-4]）幾乎都圍繞介面 → **[課外讀物 E-7-6] D — 依賴反轉原則**。
+
+</details>
+
 ## 課外讀物
 
 > 介面 = trait 的概念 → **rust 課程 [rust-5-2]**；介面隔離 → [課外讀物 E-7-5](../../../課外讀物/E-7-solid/E-7-5-isp.md)

@@ -123,6 +123,76 @@ graph TB
 2. 用 `RefCell<i32>` 包一個計數器，多次 `borrow_mut()` 把它加到 10，印出結果（注意 `RefCell` 本身不用 `mut`）。
 3. 思考題：`RefCell` 把借用檢查放到執行期，違規時會 panic。比起編譯期就擋下，這「好」還是「不好」？什麼情況下值得這個取捨？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用 `Rc` 共享 `String`、clone 三份、觀察計數**
+
+```rust
+use std::rc::Rc;
+
+fn main() {
+    let shared = Rc::new(String::from("共用字串"));
+    println!("一開始：{}", Rc::strong_count(&shared));   // 1
+
+    let a = Rc::clone(&shared);
+    let b = Rc::clone(&shared);
+    {
+        let c = Rc::clone(&shared);
+        println!("clone 三份後：{}", Rc::strong_count(&shared));   // 4（原本 1 + a + b + c）
+    }   // ← c 在這裡離開範圍，計數 -1
+
+    println!("c 離開後：{}", Rc::strong_count(&shared));   // 3
+    println!("內容：{} / {} / {}", shared, a, b);
+}
+```
+
+輸出：
+```
+一開始：1
+clone 三份後：4
+c 離開後：3
+內容：共用字串 / 共用字串 / 共用字串
+```
+
+重點：一開始 `shared` 自己就算 1 個擁有者，再 clone 三份就變 4（不是 3）。`Rc::clone` 只是「計數 +1」，三份 `a`/`b`/`c` 和 `shared` 共享**同一份底層字串**，沒有複製文字內容。`c` 一離開它那對 `{ }` 範圍，計數立刻降回 3。
+
+**第 2 題：用 `RefCell<i32>` 當計數器加到 10**
+
+```rust
+use std::cell::RefCell;
+
+fn main() {
+    let counter = RefCell::new(0);   // 注意：counter 沒有寫 mut
+
+    for _ in 0..10 {
+        *counter.borrow_mut() += 1;  // 每次借一個可變借用來 +1，用完馬上還
+    }
+
+    println!("結果：{}", counter.borrow());   // 10
+}
+```
+
+重點：`counter` 本身不是 `mut`，卻能改它內部的值——這就是「內部可變性」。這裡刻意讓每次 `borrow_mut()` 產生的可變借用「用完當場就還掉」（該行結束就釋放），所以迴圈裡不會同時存在兩個借用，不會 panic。
+
+反例提醒——**下面這樣寫會執行期 panic**：
+```rust
+let mut a = counter.borrow_mut();
+let mut b = counter.borrow_mut();   // ❌ 同時拿兩個可變借用 → 執行時 panic：already borrowed
+```
+
+**第 3 題（思考題）：借用檢查延到執行期，好還是不好？**
+
+先講結論：**這是一個「取捨」，沒有絕對好壞，端看你的需求。**
+
+- **編譯期檢查（Rust 預設）的好處**：問題在你按下編譯的那一刻就被抓出來，程式根本不會出貨到使用者手上就已經確定「不會有借用衝突」。這是最安全的，也「零執行成本」。缺點是規則很嚴，有些「其實安全、但編譯器證明不了」的寫法會被一併擋掉。
+
+- **`RefCell` 把檢查延到執行期的代價**：借用是否衝突變成「跑到那一行才知道」，違規時會 panic（程式當場崩潰）。而且每次 `borrow`/`borrow_mut` 都要在執行期查一下「現在有沒有別人借著」，有一點點執行成本。萬一那條有問題的路徑很少被走到、測試又沒覆蓋到，這個 panic 就可能潛伏到上線後才爆。
+
+**什麼情況值得這個取捨？** 當你的資料結構「邏輯上安全，但編譯器的靜態規則證明不出來」時。最典型的就是 `Rc<RefCell<T>>` 這種「多個擁有者、又都要能改」的共享結構（例如圖、某些樹）——用純所有權/借用根本寫不出來，這時 `RefCell` 就是必要的逃生出口。心法是：**能用編譯期保證的，就別用 `RefCell`；只有在預設規則真的擋住合理需求時，才接受「延到執行期」這個代價。**
+
+</details>
+
 ## 課外讀物
 
 > 引用計數作為記憶體管理策略（對比 GC、所有權）→ **cs 課程 Part 5：作業系統（記憶體管理）**

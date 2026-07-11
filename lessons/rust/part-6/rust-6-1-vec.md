@@ -122,6 +122,56 @@ fn main() {
 2. 用 `vec![]` 建一個數字向量，用 `for ... in &v` 走訪算出總和並印出。
 3. 用 `.get()` 安全地嘗試讀取一個「可能越界」的索引，用 `match` 印出「有」或「沒有」。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**：`Vec::new()` 建空向量時推斷不出型別，所以要標 `Vec<String>`；水果名字面值是 `&str`，要 `.to_string()` 轉成 `String` 才能 `push` 進去。
+
+```rust
+fn main() {
+    let mut fruits: Vec<String> = Vec::new();
+    fruits.push("蘋果".to_string());
+    fruits.push("香蕉".to_string());
+    fruits.push("橘子".to_string());
+    println!("{:?}", fruits); // ["蘋果", "香蕉", "橘子"]
+}
+```
+
+小提醒：字面值 `"蘋果"` 是 `&str`（借用），而 `Vec<String>` 要的是擁有的 `String`，所以中間要 `.to_string()` 這道轉換。
+
+**練習 2**：用 `for n in &v` **借用**走訪，這樣走訪完 `v` 還能用；`sum` 用 `mut` 才能持續累加。
+
+```rust
+fn main() {
+    let v = vec![10, 20, 30, 40];
+    let mut sum = 0;
+    for n in &v {
+        sum += n; // n 是 &i32，這裡 Rust 會自動解參考做加法
+    }
+    println!("總和是 {}", sum); // 總和是 100
+}
+```
+
+驗收點：如果寫成 `for n in v`（沒有 `&`），向量的擁有權會被移動進迴圈，迴圈之後就不能再用 `v` 了——這是很常見的初學卡點。
+
+**練習 3**：`.get()` 回傳 `Option`，越界給 `None` 而不會 panic，正好用 `match` 兩個分支處理。
+
+```rust
+fn main() {
+    let nums = vec![1, 2, 3];
+    let index = 5; // 故意越界
+
+    match nums.get(index) {
+        Some(v) => println!("第 {} 個是 {}", index, v),
+        None => println!("沒有第 {} 個元素", index), // 走這裡
+    }
+}
+```
+
+如果把 `index` 改成 `0`，就會走 `Some` 分支印出 `第 0 個是 1`。對照之下，`nums[5]` 會直接 panic，這就是 `.get()` 更安全的地方。
+
+</details>
+
 ## 課外讀物
 
 > `Vec` 的自動擴容、攤銷成本、與鏈結串列的取捨 → **dsa 課程 Part 2：陣列、動態陣列、鏈結串列**

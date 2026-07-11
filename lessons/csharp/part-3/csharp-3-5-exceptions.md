@@ -121,6 +121,77 @@ graph TB
 2. 寫一個方法，參數若不合法就 `throw new ArgumentException` 帶清楚訊息，在呼叫處 catch 它。
 3. 思考題：為什麼「空的 `catch {}`（吞掉錯誤）」是大忌？它會造成什麼後果？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：輸入轉數字相除，分別捕捉兩種例外**
+
+把「可能出錯」的程式碼放進 `try`，用**多個 catch 各自處理**：`int.Parse` 遇到非數字丟 `FormatException`；除以零丟 `DivideByZeroException`。分開捕捉才能給使用者精準的提示：
+
+```csharp
+try
+{
+    Console.Write("請輸入被除數：");
+    int a = int.Parse(Console.ReadLine());
+    Console.Write("請輸入除數：");
+    int b = int.Parse(Console.ReadLine());
+
+    int result = a / b;                 // b 為 0 會丟 DivideByZeroException
+    Console.WriteLine($"結果：{result}");
+}
+catch (FormatException)
+{
+    Console.WriteLine("輸入的不是有效的數字");
+}
+catch (DivideByZeroException)
+{
+    Console.WriteLine("不能除以零");
+}
+```
+
+驗收點：輸入 `abc` 走 `FormatException` 分支、除數輸入 `0` 走 `DivideByZeroException` 分支、正常輸入則印出商。此題需自行實機輸入不同值驗證三種情況。
+
+**第 2 題：不合法就主動 `throw`，呼叫處 catch**
+
+在方法裡檢查參數，不合法就 `throw new ArgumentException` 並帶**清楚的訊息**（說明哪裡錯）；呼叫端用 `try/catch` 捕捉並顯示訊息：
+
+```csharp
+int Divide(int a, int b)
+{
+    if (b == 0)
+        throw new ArgumentException("除數不能為零");   // 訊息要對人有意義
+    return a / b;
+}
+
+// 呼叫處捕捉
+try
+{
+    int result = Divide(10, 0);
+    Console.WriteLine(result);
+}
+catch (ArgumentException ex)
+{
+    Console.WriteLine($"參數錯誤：{ex.Message}");   // 參數錯誤：除數不能為零
+}
+```
+
+驗收點：呼叫 `Divide(10, 0)` 會進入 catch，印出「參數錯誤：除數不能為零」；呼叫 `Divide(10, 2)` 則正常回傳 5。重點是**選對例外類型（參數錯用 `ArgumentException`）＋訊息寫清楚**。
+
+**第 3 題（思考題）：為什麼空的 `catch {}` 是大忌？**
+
+空的 `catch {}` 表示「出錯了，但我什麼都不做、假裝沒事」，它的可怕之處在於：
+
+1. **問題被藏起來**：錯誤本來會明確地讓程式停下、告訴你哪裡出事；吞掉之後，程式若無其事地繼續往下跑。
+2. **在莫名其妙的地方爆炸**：例如某個查詢失敗、回傳了 null 卻被吞掉，程式繼續跑到很後面才因為「拿 null 來用」而 `NullReferenceException`——這時錯誤現場離真正的病灶已經很遠，超難追。
+3. **資料可能悄悄壞掉**：一筆該寫入資料庫的操作失敗卻被吞了，使用者以為成功、資料其實沒存，變成難以察覺的資料不一致。
+4. **線上事故無法定位**：後端服務最重視「可觀測」——錯誤被吞掉就沒有 log、沒有堆疊追蹤，事故發生時完全無從查起（sre 課程）。
+
+正確做法：**至少把錯誤記錄下來（log），或往上拋（rethrow）讓有能力處理的人處理**。如果真的「預期會出錯且可以安全略過」，也要在 catch 裡寫註解說明為什麼可以忽略，而不是留一個空的 `{}`。
+
+> 別吞錯誤、寫有意義的錯誤訊息 → [課外讀物 E-6-8：後端 Clean Code](../../../課外讀物/E-6-best-practices/E-6-8-backend-clean-code.md)
+
+</details>
+
 ## 課外讀物
 
 > 錯誤處理設計、別吞錯誤、有意義的訊息 → [課外讀物 E-6-8：後端 Clean Code](../../../課外讀物/E-6-best-practices/E-6-8-backend-clean-code.md)

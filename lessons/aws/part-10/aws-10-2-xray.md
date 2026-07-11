@@ -109,11 +109,35 @@ X-Ray 需要在你的應用「埋點」——加入 X-Ray 的 SDK，讓它在處
 
 回答：為什麼 AWS 上（尤其微服務/serverless）的請求需要分散式追蹤？X-Ray 對應你 SRE Part 3-5 學的什麼？
 
+<details>
+<summary>參考解答</summary>
+
+**為什麼需要**：在 AWS 上，一個請求常常穿過好幾個服務——例如 API Gateway → Lambda → DynamoDB → 外部 API，或 ALB → ECS → RDS → ElastiCache。當這個請求變慢或出錯時，「**到底卡在哪一段？是哪個服務？**」很難查——因為每個服務的日誌是分開的，你得在四五份日誌裡大海撈針、猜半天。微服務/serverless 把系統拆得更碎，這問題更嚴重。
+
+分散式追蹤的解法：**給每個請求一個追蹤 ID，讓它一路帶著穿過所有服務，把每一段的耗時、成功/失敗都記下來，最後組成一張「請求旅程的瀑布圖」**——一眼看出卡在哪。
+
+**對應 SRE Part 3-5 學的**：就是 **Trace（一個請求的完整旅程）與 Span（旅程中的每一段）**。X-Ray 就是這套概念的 AWS 版：X-Ray 的 Segment / Subsegment 對應 SRE 的 Span，X-Ray 的 Trace 就是 SRE 的 Trace。它也是 SRE Part 3-2「觀測三支柱」裡的 Traces 那一根。
+
+</details>
+
 ---
 
 ### 練習 2：三支柱整合
 
 回答：在 AWS 上，CloudWatch（Metrics/Logs）和 X-Ray（Traces）怎麼配合，組成 SRE Part 3-2 的完整三支柱除錯流程？
+
+<details>
+<summary>參考解答</summary>
+
+三支柱在 AWS 上的分工：**CloudWatch 提供 Metrics 和 Logs 兩根，X-Ray 補上 Traces 那根**。合起來的除錯流程是：
+
+1. **CloudWatch Metrics 發現異常（What／有沒有事）**：看指標圖發現「ALB 的 p99 延遲飆高」或「5xx 錯誤率上升」——先知道「出事了」。
+2. **X-Ray 定位是哪一段（Where／哪裡出事）**：打開 Service Map 看哪個服務標紅，再追一個慢請求的 trace 瀑布圖，發現「卡在呼叫 DynamoDB 那段 2 秒」——鎖定範圍。
+3. **CloudWatch Logs 找根因（Why／為什麼）**：去看那個服務、那段時間的日誌，發現「某查詢沒用索引」——找到真正原因。
+
+一句話：**Metrics 告訴你「有沒有事」、Traces 告訴你「事在哪一段」、Logs 告訴你「為什麼」**。三根柱子接力，從「發現異常」一路縮小到「根因」，而不是一開始就漫無目的翻日誌。這正是 SRE Part 3-2 三支柱除錯的精神，只是換成 AWS 的受管工具實現。
+
+</details>
 
 ---
 
@@ -123,6 +147,20 @@ X-Ray 需要在你的應用「埋點」——加入 X-Ray 的 SDK，讓它在處
 
 1. 問題在哪一段？
 2. 你接下來會用什麼（哪支柱）去查那段「為什麼」慢？
+
+<details>
+<summary>參考解答</summary>
+
+1. **問題在「RDS 查詢」那段**。它吃掉 1,650ms，占了總時間 1,800ms 的九成以上（91%），其他段（API Gateway 20ms、Lambda 80ms、回應 50ms）加起來才 150ms，都很正常。瓶頸很明顯就是資料庫查詢。
+
+2. **接下來用「Logs」這支柱去查為什麼慢**（trace 已經幫你定位到「哪一段」，Logs 幫你找「為什麼」）。具體做法：
+   - 看那個服務／那次查詢的 **CloudWatch Logs**，找出實際跑的 SQL 語句。
+   - 搭配 **RDS 的指標/慢查詢日誌**，常見原因是：查詢沒用到索引（全表掃描）、N+1 查詢、鎖等待、或連線池被占滿。
+   - 對照 SRE 除錯流程：Metrics 發現延遲高 → X-Ray（Traces）定位是 RDS 段 → Logs／慢查詢找根因。
+
+> 補充：像這種資料庫慢查詢，常見對策是加索引、加快取（ElastiCache）、或優化查詢——呼應 aws-6-3 的快取與資料庫章節。
+
+</details>
 
 ## 課外讀物
 

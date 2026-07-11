@@ -120,6 +120,74 @@ async Task<User> GetUserAsync(int id)
 2. 寫兩個非同步方法，用 await 依序呼叫，觀察「開始 → 等 → 完成」的流程。
 3. 思考題：為什麼「查資料庫」適合用 async，但「計算一百萬個數字的總和」不適合？（提示：一個在「等」、一個在「算」，呼應 rust 課程 [rust-8-5]。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：`AddAsync` 非同步相加**
+
+方法標 `async`、回傳 `Task<int>`（未來會回傳一個 int），裡面 `await Task.Delay(500)` 模擬「要等的事」，等完再回傳 `a + b`。呼叫時用 `await` 取出結果：
+
+```csharp
+using System.Threading.Tasks;
+
+async Task<int> AddAsync(int a, int b)
+{
+    await Task.Delay(500);      // 模擬 0.5 秒的等待（等待期間讓出執行緒）
+    return a + b;
+}
+
+// 呼叫端自己也要是 async，才能 await
+int sum = await AddAsync(3, 4);
+Console.WriteLine(sum);         // 7
+```
+
+驗收點：約 0.5 秒後印出 `7`。注意回傳型別是 `Task<int>` 而不是 `int`——`await` 會幫你把 `Task<int>` 裡的 `int` 取出來。
+
+**第 2 題：依序 await 兩個非同步方法**
+
+用兩個 `await` 依序呼叫，第二個會等第一個完成後才開始。透過 `Console.WriteLine` 就能觀察「開始 → 等 → 完成」的順序：
+
+```csharp
+async Task<string> StepOneAsync()
+{
+    Console.WriteLine("步驟一：開始");
+    await Task.Delay(1000);             // 等 1 秒
+    Console.WriteLine("步驟一：完成");
+    return "結果一";
+}
+
+async Task<string> StepTwoAsync()
+{
+    Console.WriteLine("步驟二：開始");
+    await Task.Delay(1000);
+    Console.WriteLine("步驟二：完成");
+    return "結果二";
+}
+
+async Task RunAsync()
+{
+    var r1 = await StepOneAsync();      // 先等步驟一整個做完
+    var r2 = await StepTwoAsync();      // 再開始步驟二
+    Console.WriteLine($"全部完成：{r1}, {r2}");
+}
+
+await RunAsync();
+```
+
+驗收點：輸出順序是「步驟一：開始 → 步驟一：完成 → 步驟二：開始 → 步驟二：完成 → 全部完成」。因為是**依序 await**，步驟二一定在步驟一完成後才開始。（延伸想一想：若改用 `Task.WhenAll` 同時啟動兩個，就能並行、總時間接近 1 秒而非 2 秒——這需要自己實機跑跑看時間差。）
+
+**第 3 題（思考題）：為什麼查資料庫適合 async、算總和不適合？**
+
+關鍵在於這件事到底是在「**等**」還是在「**算**」：
+
+- **查資料庫是 I/O 密集（在「等」）**：發出查詢後，你的程式其實沒在做任何運算，只是在等資料庫那頭處理完、把資料透過網路送回來。這段等待時間裡，`await` 能把執行緒**讓出去服務別的請求**——所以 async 大有幫助，這正是它的主場。
+
+- **算一百萬個數字總和是 CPU 密集（在「算」）**：CPU 從頭到尾都在忙著做加法運算，沒有任何「空檔」可以讓出去。把它包成 async 並不會讓運算變快，也沒有可以讓出的等待時間——`async` 幫不上忙。要加速這種工作得靠**多執行緒／平行運算**（把工作切給多顆 CPU 核心一起算，rust 課程 [rust-8-3]），那是另一回事。
+
+一句話：**async 解決的是「等待浪費」，不是「運算太慢」**。在「等」的用 async，在「算」的用多執行緒。
+
+</details>
+
 ## 課外讀物
 
 > 非同步的底層原理（IO 密集 vs CPU 密集）→ **rust 課程 [rust-8-5]**、**cs 課程 Part 5-7（中斷）**

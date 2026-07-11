@@ -104,6 +104,67 @@ graph TB
 2. 試著移除 `'a` 標註，看編譯器的 `missing lifetime specifier` 錯誤，理解它為什麼困惑。
 3. 寫一個 `fn first_word(s: &str) -> &str`，回傳第一個空白前的切片。觀察：這個**不用**寫 `'a`（因為只有一個來源），印證省略規則。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：帶 `'a` 標註的 `longest`，用兩個 `String` 的參考測試**
+
+```rust
+fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
+    if a.len() > b.len() { a } else { b }
+}
+
+fn main() {
+    let s1 = String::from("這是比較長的字串");
+    let s2 = String::from("短");
+    let result = longest(&s1, &s2);
+    println!("較長的是：{}", result);   // 較長的是：這是比較長的字串
+}
+```
+
+做法：把 `<'a>` 宣告在函式名後面，三個 `&str`（兩個參數 + 回傳值）都標上同一個 `'a`。驗收點：能編譯、印出較長的那個字串。因為 `s1`、`s2` 在 `println!` 時都還活著，安全無虞。（需自行實機 `cargo run` 驗證輸出。）
+
+**第 2 題：移除 `'a` 觀察錯誤**
+
+把簽名改回 `fn longest(a: &str, b: &str) -> &str`（拿掉所有 `'a`）後編譯，會看到類似：
+
+```
+error[E0106]: missing lifetime specifier
+ --> src/main.rs
+  |
+  | fn longest(a: &str, b: &str) -> &str {
+  |               ----     ----     ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but the
+          signature does not say whether it is borrowed from `a` or `b`
+```
+
+理解：編譯器困惑的點就是錯誤訊息最後那句——「回傳的參考到底是借 `a` 還是借 `b`？」。因為 `longest` 有**兩個**參考來源，生命週期省略規則無法判斷回傳值該跟誰的壽命綁定，所以要求你親手用 `'a` 標註講清楚。（需自行實機編譯，觀察真實錯誤訊息，版本不同文字可能略有差異。）
+
+**第 3 題：`first_word` 不用寫 `'a`**
+
+```rust
+fn first_word(s: &str) -> &str {
+    for (i, ch) in s.char_indices() {
+        if ch == ' ' {
+            return &s[..i];   // 遇到第一個空白，回傳它之前的切片
+        }
+    }
+    s   // 整段都沒空白，整個回傳
+}
+
+fn main() {
+    let sentence = String::from("hello rust world");
+    println!("{}", first_word(&sentence));   // hello
+}
+```
+
+做法：用 `char_indices()` 逐字元掃描（同時拿到位元組索引 `i` 和字元 `ch`），碰到第一個空白就回傳 `&s[..i]` 這段切片；若整段沒有空白，就回傳整個 `s`。
+
+觀察重點：這個函式**只有一個參考來源** `s`，所以生命週期省略規則能明確推斷「回傳的切片一定借自 `s`」，毫無歧義，編譯器自動幫你補好，不用寫 `'a`。這正是為什麼你平常寫大量帶參考的函式都不必標註——只有像 `longest` 那種多來源、有歧義的情況才需要。（需自行實機 `cargo run` 驗證輸出為 `hello`。）
+
+</details>
+
 ## 課外讀物
 
 > 生命週期的入門概念與「為什麼要有它」 → 複習 [rust-2-8]

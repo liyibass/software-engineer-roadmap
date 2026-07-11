@@ -122,6 +122,97 @@ Console.WriteLine(todo.IsDone);           // false（建構子設的預設）
 2. 給 `Book` 加一個建構子，接收三個參數初始化欄位，用建構子建立物件。
 3. 給 `Book` 加一個方法 `IsLong()`，頁數超過 300 回傳 true，測試它。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：定義 `Book` class、建立兩本書並印出資訊**
+
+先照藍圖定義型別，再用 `new` 造兩個獨立物件，各自設定欄位：
+
+```csharp
+class Book
+{
+    public string Title;
+    public string Author;
+    public int Pages;
+}
+
+Book book1 = new Book();
+book1.Title = "深入淺出 C#";
+book1.Author = "王小明";
+book1.Pages = 420;
+
+Book book2 = new Book();
+book2.Title = "資料結構入門";
+book2.Author = "李小華";
+book2.Pages = 250;
+
+Console.WriteLine($"《{book1.Title}》作者：{book1.Author}，共 {book1.Pages} 頁");
+Console.WriteLine($"《{book2.Title}》作者：{book2.Author}，共 {book2.Pages} 頁");
+```
+
+重點：`book1` 和 `book2` 是同一個藍圖造出的兩個實體，各有各的資料，改 `book1` 不會動到 `book2`。
+
+**第 2 題：加建構子，用它建立物件**
+
+建構子和 class 同名、沒有回傳型別，讓你建立物件時一次把值帶進去：
+
+```csharp
+class Book
+{
+    public string Title;
+    public string Author;
+    public int Pages;
+
+    public Book(string title, string author, int pages)
+    {
+        Title = title;
+        Author = author;
+        Pages = pages;
+    }
+}
+
+// 一行就把三個欄位都初始化好
+Book book = new Book("深入淺出 C#", "王小明", 420);
+Console.WriteLine($"《{book.Title}》{book.Pages} 頁");
+```
+
+比起「先 new 再一個個設欄位」，建構子更精簡，也保證物件一建立就有完整資料。
+
+**第 3 題：加 `IsLong()` 方法並測試**
+
+方法能直接讀自己的欄位，回傳布林值（用肯定句命名 `IsLong`）：
+
+```csharp
+class Book
+{
+    public string Title;
+    public string Author;
+    public int Pages;
+
+    public Book(string title, string author, int pages)
+    {
+        Title = title;
+        Author = author;
+        Pages = pages;
+    }
+
+    public bool IsLong()
+    {
+        return Pages > 300;      // 頁數超過 300 才算「厚書」
+    }
+}
+
+Book thick = new Book("大部頭", "某作者", 420);
+Book thin = new Book("小書", "另一作者", 120);
+Console.WriteLine(thick.IsLong());   // True
+Console.WriteLine(thin.IsLong());    // False
+```
+
+注意題目說「超過 300」，所以用 `>` 而不是 `>=`，剛好 300 頁不算 long。
+
+</details>
+
 ## 課外讀物
 
 > class 是參考型別 → 複習 [csharp-1-2]；對照 rust 的 struct + new → **rust 課程 [rust-3-1]、[rust-3-2]**

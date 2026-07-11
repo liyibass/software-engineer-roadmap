@@ -107,6 +107,65 @@ graph TB
 2. 用 `Dictionary<string, int>` 存三個國家 → 人口，查一個存在的、用 `ContainsKey` 安全查一個不存在的。
 3. 思考題：「一週七天的名稱」「使用者的待辦清單（會增減）」「學號 → 學生資料」各該用哪個集合？為什麼？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：List&lt;int&gt; 存五個分數，算總分與平均**
+
+用 `foreach` 走訪每個分數累加成 `total`，平均就是總分除以數量。注意整數相除會截斷小數，所以除的時候把 `total` 轉成 `double`：
+
+```csharp
+List<int> scores = new List<int> { 80, 90, 70, 100, 60 };
+int total = 0;
+
+foreach (var score in scores)
+{
+    total += score;
+}
+
+double average = (double)total / scores.Count;   // 轉 double 才有小數
+Console.WriteLine($"總分：{total}");               // 總分：400
+Console.WriteLine($"平均：{average}");             // 平均：80
+```
+
+`scores.Count` 是 List 取數量的方式（陣列是 `.Length`，List 是 `.Count`，別搞混）。`(double)total` 這個轉型很重要——不轉的話 `400 / 5` 剛好整除還好，但像 `410 / 5` 若兩邊都是 int 會丟掉小數。
+
+**練習 2：Dictionary 存國家 → 人口**
+
+用 `[key] = value` 設定，取值前用 `ContainsKey` 安全檢查（直接取不存在的 key 會丟例外）：
+
+```csharp
+Dictionary<string, int> population = new Dictionary<string, int>();
+population["台灣"] = 2300;
+population["日本"] = 12500;
+population["韓國"] = 5100;
+
+// 查一個存在的
+Console.WriteLine($"台灣：{population["台灣"]}");   // 台灣：2300
+
+// 用 ContainsKey 安全查一個不存在的
+if (population.ContainsKey("美國"))
+{
+    Console.WriteLine($"美國：{population["美國"]}");
+}
+else
+{
+    Console.WriteLine("沒有美國的資料");           // 走這條
+}
+```
+
+為什麼要先 `ContainsKey`？因為直接寫 `population["美國"]` 而 key 不存在時，程式會丟出 `KeyNotFoundException`。先檢查就能安全處理「查無此 key」的情況。
+
+**練習 3：思考題——各該用哪個集合？**
+
+- **一週七天的名稱**：用**陣列** `string[]`。因為數量固定（永遠 7 天）、已知、不會增減，陣列最合適也最省。
+- **使用者的待辦清單（會增減）**：用 **`List<string>`**。因為會一直新增、刪除項目，數量不固定——正是動態陣列 List 的主場（`.Add()` / `.Remove()`）。
+- **學號 → 學生資料**：用 **`Dictionary<string, Student>`**（key 是學號）。因為需求是「用學號快速查到對應的學生」，這是典型的 key-value 查找，Dictionary 平均 O(1) 最快。
+
+判斷心法就是本章的決策圖：固定數量用陣列、動態清單用 List、用 key 查 value 用 Dictionary。
+
+</details>
+
 ## 課外讀物
 
 > 這些集合背後的資料結構 → **dsa 課程 Part 2（陣列、動態陣列）、Part 3（雜湊表）**

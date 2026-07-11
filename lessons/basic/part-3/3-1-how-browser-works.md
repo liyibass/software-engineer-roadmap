@@ -229,6 +229,18 @@ fetch('https://jsonplaceholder.typicode.com/todos/1')
 - 數一下，這個網站總共發出了幾個請求？
 - 找一個 HTML 類型的請求，點進去看 **Response** 分頁，你看到了什麼？
 
+<details>
+<summary>參考解答</summary>
+
+這題要實際打開瀏覽器操作，**請自行實機驗證**。以下是你會觀察到的重點：
+
+- **請求數量**：一個現代網站通常會發出幾十到上百個請求，不會只有一個。因為除了 HTML 本身，還有 CSS、JavaScript、圖片、字型、追蹤分析用的第三方腳本等等，每一項都是一個獨立請求——這正好呼應本章說的「瀏覽器和伺服器之間是多次往返的對話」。
+- **HTML 請求的 Response**：找到 Type 欄位是 `document` 的那筆（通常是清單最上面那筆，網址就是你輸入的網址）。點進 Response 分頁，你會看到**一大串 HTML 原始碼**——`<!DOCTYPE html>`、`<head>`、`<body>` 等標籤。這就是伺服器回傳給你的「毛胚屋」，瀏覽器再拿它去解析成畫面。
+
+驗收點：你能分辨出哪一筆是 HTML（document），並看到裡面是純文字的標籤，而不是你眼睛看到的漂亮畫面——這代表你理解了「原始 HTML」和「渲染後畫面」是兩回事。
+
+</details>
+
 **練習 2**：用文字（不用程式碼）回答：「當你在 Instagram 按下愛心，瀏覽器做了哪些事？」
 
 用這個 pseudo code 格式來回答：
@@ -242,10 +254,65 @@ fetch('https://jsonplaceholder.typicode.com/todos/1')
 
 沒有標準答案，試著用這章學到的概念推理看看。
 
+<details>
+<summary>參考解答</summary>
+
+這是開放題，沒有標準答案。以下是一個用本章概念推理的示範答案：
+
+```
+使用者點了愛心之後：
+  1. JavaScript 監聽到愛心按鈕的「點擊事件」，執行對應的處理函式
+  2. 畫面上的愛心「立刻」變成紅色實心（先更新 UI，讓使用者覺得很快，
+     這叫 optimistic update / 樂觀更新）
+  3. 瀏覽器透過網路發送一個 HTTP 請求給 Instagram 伺服器：
+     「使用者 A 對貼文 B 按了讚」
+  4. 伺服器把這筆讚存進資料庫，然後回傳一個成功的回應
+  5. 瀏覽器收到成功回應；如果失敗（例如斷網），JavaScript 會把愛心
+     改回空心，並可能提示使用者
+```
+
+說明：這個答案的關鍵在於分辨「畫面更新」和「網路請求」是兩件事——愛心變紅是本機 JavaScript 立刻做的（不用等伺服器），而「這個讚要被記住」則需要發請求給伺服器。這正是本章「HTML/CSS/JS 各司其職」加上「瀏覽器會發網路請求」兩個概念的結合。只要你的答案有抓到「JS 處理點擊 + 發請求給伺服器」這條主線，就算合理。
+
+</details>
+
 **練習 3**：建立一個 `index.html` 檔案，把上面的「最陽春的 HTML 頁面」範例貼進去，用瀏覽器打開。然後：
 
 - 把 `steelblue` 改成 `tomato`，重新整理，看看標題顏色變了嗎？
 - 把 `alert('嗨！你點到我了')` 改成 `console.log('你點到我了')`，點按鈕後去 Console 分頁，看看有沒有出現訊息？
+
+<details>
+<summary>參考解答</summary>
+
+這題要動手改檔案並用瀏覽器打開，**請自行實機驗證**。以下是你應該看到的結果與做法：
+
+第一步，把 `<style>` 裡的顏色改掉：
+
+```html
+<style>
+  h1 {
+    color: tomato; /* 原本是 steelblue */
+  }
+</style>
+```
+
+存檔後重新整理，標題會從鋼鐵藍變成番茄紅（tomato 是 CSS 內建的顏色名稱之一）。
+
+第二步，把 alert 改成 console.log：
+
+```html
+<script>
+  document.getElementById('greet-btn').addEventListener('click', () => {
+    console.log('你點到我了'); // 原本是 alert(...)
+  });
+</script>
+```
+
+驗收點：
+
+- 改 `tomato` 後重新整理，標題顏色**確實變了** → 代表你知道 CSS 控制外觀。
+- 改成 `console.log` 後，點按鈕**不會再跳出提示框**，而是要打開 DevTools 的 **Console** 分頁才看得到「你點到我了」這行字。這說明 `alert` 是彈窗、`console.log` 是印到主控台，兩者用途不同：`alert` 會打斷使用者，開發時我們通常用 `console.log` 觀察程式運作。
+
+</details>
 
 ---
 

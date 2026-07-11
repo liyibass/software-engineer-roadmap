@@ -103,6 +103,53 @@ graph LR
 2. 寫一個 POST Action 接收它，用 Swagger 送一筆「不合法」的資料（空名字、負價格），觀察自動回傳 400 + 錯誤訊息。
 3. 思考題：為什麼說「永不信任使用者輸入」？如果不驗證，可能發生什麼壞事（提示：資安、髒資料）？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：定義 `CreateProductDto`，在每個屬性上宣告驗證屬性。`Name` 用 `[Required]` + `[StringLength]`；`Price` 用 `[Range]` 限制 0 以上；`Email` 用 `[Required]` + `[EmailAddress]`。
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+public class CreateProductDto
+{
+    [Required]                              // 必填，不能是 null
+    [StringLength(50, MinimumLength = 1)]   // 長度 1~50
+    public string Name { get; set; } = "";
+
+    [Range(0, double.MaxValue)]             // 價格 0 以上（不能是負數）
+    public decimal Price { get; set; }
+
+    [Required]
+    [EmailAddress]                          // 必須是合法 email 格式
+    public string Email { get; set; } = "";
+}
+```
+
+小提醒：金額用 `decimal` 而非 `double`（避免浮點誤差，呼應 [csharp-2] 的型別選擇）。`[Range(0, ...)]` 保證價格非負。
+
+**第 2 題**：寫一個接收它的 POST Action。因為 Controller 有 `[ApiController]`，驗證會**自動執行**——不合法的資料根本進不到方法內。
+
+```csharp
+[HttpPost]
+public IActionResult Create([FromBody] CreateProductDto dto)
+{
+    // 能執行到這裡，代表 dto 已經通過驗證（合法資料）
+    return Ok($"建立商品：{dto.Name}，價格 {dto.Price}");
+}
+```
+
+驗收點：在 Swagger 送一筆「不合法」的資料，例如 `{ "name": "", "price": -100, "email": "壞格式" }`。你會收到 **400 Bad Request**，回應 body 是一份 `errors` 清單，逐欄說明哪裡錯了（`Name` 太短、`Price` 超出範圍、`Email` 格式不對）——而你的 Action 一行都沒執行。**這步需自行實機跑 Swagger 觀察 400 回應。**
+
+**第 3 題（思考題）**：使用者送來的資料可能來自任何地方（瀏覽器、腳本、惡意攻擊者），你**無法控制對方送什麼**，所以要假設它可能是壞的、甚至是刻意攻擊。不驗證的壞處分兩類：
+
+- **資安風險**：沒過濾的輸入可能夾帶攻擊，例如把惡意字串存進資料庫再回傳給其他人（XSS）、或拼進 SQL 查詢造成 SQL Injection（呼應 [課外讀物 E-10](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)）。
+- **髒資料 / 邏輯崩壞**：負的年齡、空的名字、亂格式的 email 一旦進了資料庫，後續統計、寄信、顯示都會出錯，而且髒資料很難事後清理。等於把「守門」的責任推給了下游每一段程式。
+
+所以驗證是 API 的**第一道防線**——把不合法的請求擋在門外，讓後面的業務邏輯只需要面對乾淨、可信的資料。
+
+</details>
+
 ## 課外讀物
 
 > 「永不信任輸入」是資安基礎 → [課外讀物 E-10：Web Security 基礎](../../../課外讀物/E-10-security/E-10-1-web-security-overview.md)

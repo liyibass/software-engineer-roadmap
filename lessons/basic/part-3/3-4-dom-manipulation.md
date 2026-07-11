@@ -363,6 +363,121 @@ function createTodoItem(text: string): HTMLLIElement {
 
 **練習 1**：在現有的 Todo App 裡，用 `querySelectorAll("li")` 選取所有 `<li>` 元素，並用 `console.log` 印出每個項目的 `textContent`。（先手動在 HTML 裡加幾個 `<li>` 測試，或是新增幾個再跑。）
 
+<details>
+<summary>參考解答</summary>
+
+`querySelectorAll` 回傳的是一個 NodeList（類似陣列），可以用 `forEach` 逐一走過：
+
+```typescript
+// 選取頁面上所有的 <li>
+const items = document.querySelectorAll<HTMLLIElement>("li")
+
+// 逐一印出每個項目的文字
+items.forEach((item) => {
+  console.log(item.textContent)
+})
+```
+
+說明：
+
+- `querySelectorAll<HTMLLIElement>("li")` 用 CSS 選擇器 `li` 抓到**所有**的 `<li>`，泛型 `<HTMLLIElement>` 讓 TypeScript 知道裡面每個元素都是 `<li>`。
+- NodeList 本身就有 `forEach` 可以用（不用先轉成陣列）。如果你想用 `for...of` 也可以：`for (const item of items) { ... }`。
+- `item.textContent` 取得該節點的純文字內容。若某個 `<li>` 裡還有子元素（例如刪除按鈕），`textContent` 會回傳所有後代文字串接起來的結果。
+
+**請自行實機驗證**：在 HTML 裡先放幾個 `<li>`（或用前面章節的新增功能加幾個），打開 DevTools 的 Console 分頁，就會看到每個項目的文字一行一行印出來。
+
+</details>
+
 **練習 2**：加一個「全部清除」按鈕，點擊後清空整個 Todo 清單。提示：把 `list.innerHTML = ""` 就能清空所有子元素——想想這樣做有沒有潛在問題？（想想 `innerHTML` 和 `textContent` 的差別，以及這裡為什麼相對安全。）
 
+<details>
+<summary>參考解答</summary>
+
+先看程式碼。新增一顆「全部清除」按鈕，點擊時清空清單：
+
+```html
+<button id="clear-btn">全部清除</button>
+```
+
+```typescript
+const clearBtn = document.getElementById("clear-btn") as HTMLButtonElement
+const list = document.getElementById("todo-list") as HTMLUListElement
+
+clearBtn.addEventListener("click", () => {
+  list.innerHTML = ""   // 把 <ul> 的內容整個清空
+})
+```
+
+**關於「有沒有潛在問題」的思考：**
+
+`innerHTML = "..."` 是把「字串」當成 HTML 解析。它的風險在於：**如果你設定的字串內容來自使用者輸入**，裡面可能夾帶惡意的 `<script>` 或 `onerror` 等程式碼，被瀏覽器當作 HTML 執行——這就是 XSS（跨站腳本攻擊）。
+
+但在**這個特定情況下相對安全**，原因有二：
+
+1. 我們設定的是空字串 `""`，空字串裡不可能有任何惡意程式碼，所以這一行本身沒有 XSS 風險。
+2. `innerHTML = ""` 的效果就只是「把所有子節點移除」，等同清空。
+
+比較安全、意圖更明確的替代寫法是用 while 迴圈逐一移除，或用 `list.replaceChildren()`：
+
+```typescript
+// 更明確表達「移除所有子節點」的意圖，且完全不碰 HTML 解析
+list.replaceChildren()
+```
+
+**補充 `innerHTML` vs `textContent`**：`textContent = "<b>hi</b>"` 會原封不動顯示 `<b>hi</b>` 這幾個字（當純文字），不會變粗體；而 `innerHTML = "<b>hi</b>"` 會解析成 HTML，真的變成粗體。所以只要牽涉到使用者輸入，優先用 `textContent`，避免 `innerHTML`。
+
+</details>
+
 **練習 3**：修改 `createTodoItem` 函式，在每個 Todo 項目的最前面加上一個 `<input type="checkbox">`。勾選 checkbox 時，用 `classList.toggle("completed")` 切換完成樣式。完成後，檢查看看：點擊文字區域和點擊 checkbox 各自的行為是否符合預期？
+
+<details>
+<summary>參考解答</summary>
+
+改寫 `createTodoItem`，在最前面插入一個 checkbox，並監聽它的 `change` 事件來切換 `completed` class：
+
+```typescript
+function createTodoItem(text: string): HTMLLIElement {
+  const li = document.createElement("li")
+
+  // 最前面的勾選框
+  const checkbox = document.createElement("input")
+  checkbox.type = "checkbox"
+
+  // 文字部分
+  const span = document.createElement("span")
+  span.textContent = text
+
+  // 勾選狀態改變時，切換完成樣式
+  checkbox.addEventListener("change", () => {
+    li.classList.toggle("completed")
+  })
+
+  li.appendChild(checkbox)
+  li.appendChild(span)
+  return li
+}
+```
+
+搭配 CSS（沿用本章範例五的 `.completed`）：
+
+```css
+#todo-list li.completed span {
+  text-decoration: line-through;
+  color: #aaa;
+}
+```
+
+**關於「點擊文字 vs 點擊 checkbox 行為是否符合預期」：**
+
+這裡有個容易踩到的細節。如果你的 checkbox 版本是**監聽 checkbox 的 `change`**（如上），那只有勾選框被勾/取消時才會切換樣式，點文字不會有反應——這通常符合預期。
+
+但如果你像範例五那樣，**同時**在整個 `li` 上也加了 `click` 監聽器來 toggle，就會出現衝突：點 checkbox 時，click 事件會**冒泡**到 `li`，於是 `li` 的 click 也被觸發，導致「勾選框自己切換一次 + 冒泡讓 li 又切換一次」互相抵銷，看起來像沒反應。
+
+所以建議二選一：
+
+- **只用 checkbox 的 `change`**（推薦，語意最清楚），文字區純顯示；或
+- 若要保留「點整行也能切換」，那就在 checkbox 的事件裡用 `event.stopPropagation()` 阻止冒泡，避免重複觸發（事件冒泡的細節會在 3-5 章詳談）。
+
+**請自行實機驗證**：新增幾個項目，勾選 checkbox，文字應出現刪除線並變灰；取消勾選則恢復。確認點 checkbox 時不會「切換兩次」而失效。
+
+</details>

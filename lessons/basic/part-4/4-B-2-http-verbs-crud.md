@@ -206,6 +206,54 @@ curl http://localhost:3000/todos
 
 **練習 3**：想一想——如果 `PUT /todos/:id` 的 `request.body` 裡沒有 `completed` 這個欄位（前端忘了傳），目前的程式會發生什麼事？這算不算一個該防的錯誤？（這正是下一章「錯誤處理」要談的。）
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1**（需自行實機驗證）
+
+做法：跑起完整 CRUD 後端後，依序執行題目那五條 `curl`。
+
+驗收點（觀察每一步的回應）：
+
+```
+POST /todos      → 回 201 + 剛建立的物件，例如 {"id":1,"text":"測試","completed":false}
+GET  /todos      → 回 200 + 陣列，裡面有剛剛那筆
+PUT  /todos/1    → 回 200 + {"id":1,"text":"測試","completed":true}（completed 變 true 了）
+DELETE /todos/1  → 回 204，沒有 Body（成功刪除、沒內容要回）
+GET  /todos      → 回 200 + 空陣列 []（那筆已經被刪掉了）
+```
+
+這一輪剛好走過 Create → Read → Update → Delete 一整圈，看到「同一個 `/todos` 資源，靠不同方法完成四種操作」。
+
+**練習 2**（需自行實機驗證）
+
+做法：`curl http://localhost:3000/todos/999`（假設沒有 id 999 這筆）。
+
+驗收點：回傳的是你在 `GET /todos/:id` 裡寫的那段——狀態碼 404，Body 是：
+
+```json
+{ "error": "找不到 id 為 999 的待辦" }
+```
+
+（想同時看到狀態碼，可以加 `-i`：`curl -i http://localhost:3000/todos/999`，就會在最上面看到 `HTTP/1.1 404 Not Found`。）
+
+**練習 3**
+
+會發生的事：目前 `PUT` 的程式是 `todo.completed = request.body.completed`。如果前端沒傳 `completed`，`request.body.completed` 就是 `undefined`，於是這筆待辦的 `completed` 會被**覆蓋成 `undefined`**——程式不會當掉（不像練習 3 前一章那種直接 throw），但資料被默默寫壞了：這筆待辦既不是「完成」也不是「未完成」，前端拿到 `undefined` 畫面可能就亂掉。
+
+算不算該防的錯誤？**算，而且很典型**。它屬於「前端送來的資料不符合預期」，應該在動手更新前先檢查、不合格就回 `400 Bad Request`，例如：
+
+```typescript
+if (typeof request.body.completed !== "boolean") {
+  response.status(400).json({ error: "completed 必須是布林值" })
+  return
+}
+```
+
+這正是下一章 4-B-4「錯誤處理」要正式展開的主題——不要相信前端一定會乖乖送對格式。
+
+</details>
+
 ---
 
 ## 課外讀物

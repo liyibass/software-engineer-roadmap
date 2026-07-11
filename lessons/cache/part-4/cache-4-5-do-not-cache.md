@@ -130,11 +130,52 @@ location /api/account/ {
 
 回答：「快取了個人化內容並共享給別人」為什麼比「使用者看到舊版」嚴重得多？會造成什麼後果？
 
+<details>
+<summary>參考解答</summary>
+
+差別在於**「看到舊版」只是內容過時（惱人但無害），「共享個人化內容」是把 A 的私密資料洩漏給 B（安全事故）**。
+
+原因是 **CDN 是「共享」快取**——同一個 Edge 服務所有使用者。如果它快取了「某使用者專屬」的內容（例如 `/profile` 頁），就會把這份內容錯給其他人：
+
+```
+Alice 登入看個人頁「歡迎 Alice！餘額 $5000」
+→ CDN 只用路徑 /profile 當快取鍵、把它快取了
+→ Bob 也訪問 /profile → CDN 命中 → 把「Alice 的頁面」回給 Bob
+→ Bob 看到了 Alice 的名字和餘額 💥
+```
+
+**後果**：使用者的姓名、餘額、地址、訂單、甚至 session 等私密資料外洩給陌生人——這是**隱私外洩、資安事故**，可能違反個資法規、造成帳號被盜（若洩漏的是 session cookie）。相比之下，「看到舊版」頂多讓人看到過期的內容，重新整理就好、不會傷害到任何人。所以這個坑嚴重得多，務必嚴格區分 `public` 和 `private`。
+
+</details>
+
 ---
 
 ### 練習 2：private 的作用
 
 回答：`Cache-Control: private` 怎麼防止「Alice 的個人頁被 CDN 快取後給了 Bob」？哪些內容一定要設 private？
+
+<details>
+<summary>參考解答</summary>
+
+**`private` 怎麼防**：`private` 的意思是「**只有使用者自己的瀏覽器**可以快取，中間的**共享快取（CDN／代理）不准快取**」（cache-3-2）。所以當 Alice 的個人頁回傳 `Cache-Control: private` 時：
+
+- CDN Edge 看到 `private` → **不會**把這份內容存進共享快取。
+- 既然 CDN 根本沒存 Alice 的頁面，Bob 來要 `/profile` 時就不會命中「Alice 的快取」→ 一律回源，讓 Origin 依 Bob 的登入狀態回**Bob 自己的**頁面。
+- 這份內容頂多被 Alice 自己的瀏覽器快取（那是 Alice 的私人裝置，不會給別人），所以安全。
+
+通常還會再加 `no-cache`（存了也每次驗證，確保最新），甚至對超敏感內容用 `no-store`（完全不存）。
+
+**哪些內容一定要設 private（判斷原則：這個回應對每個人都一樣嗎？「否」就要 private）**：
+
+- 個人頁、個人資料頁（`/profile`）
+- 購物車、我的訂單、帳戶設定
+- 任何「含登入狀態／因人而異」的頁面
+- 帶 `Set-Cookie`（設定 session）的回應（甚至該用 `no-store`）
+- 敏感 API 回應（餘額、個資、信用卡資訊——建議 `no-store`）
+
+反之，logo、公開圖片、公開文章這類「對所有人都一樣」的內容才設 `public` 給 CDN 共享。
+
+</details>
 
 ---
 
@@ -146,6 +187,23 @@ location /api/account/ {
 2. 使用者登入後的「我的訂單」頁
 3. 一個帶 `Set-Cookie`（設定 session）的登入回應
 4. 回傳「使用者信用卡末四碼」的 API
+
+<details>
+<summary>參考解答</summary>
+
+判斷心法：**對所有人都一樣 → `public`；因人而異／私密 → `private`；敏感或帶登入狀態 → `no-store`**。
+
+1. **網站的公開 logo → `public`**（例如 `Cache-Control: public, max-age=86400`）。對所有人都一樣的靜態資源，正是最該給 CDN 共享快取、衝命中率的內容。
+
+2. **登入後的「我的訂單」頁 → `private`**（通常再加 `no-cache`）。因人而異、含個人資料，絕不能被 CDN 共享，否則別人會看到你的訂單。頂多讓自己的瀏覽器快取。
+
+3. **帶 `Set-Cookie`（設定 session）的登入回應 → `no-store`**（至少 `private`）。這是最危險的一種——若被共享快取存起來，CDN 會把「Alice 的 session cookie」發給 Bob，Bob 就變成 Alice 了，是嚴重資安漏洞。這種回應絕對不能被任何共享快取碰，直接 `no-store` 最保險。
+
+4. **回傳信用卡末四碼的 API → `no-store`**。高度敏感的個資，且是因人而異的 API 回應，完全不該被任何一層快取（連瀏覽器都不留），一律 `no-store`。
+
+小結：越敏感、越因人而異，就往「完全不快取（no-store）」靠；只有「對所有人都一樣」的公開內容才放心設 `public` 給 CDN。
+
+</details>
 
 ## 課外讀物
 

@@ -285,6 +285,34 @@ const availabilities = [true, false, true, true]
 
 接著對 `temperatures` 用 `.filter()` 只留下 0 度以上的氣溫，確認回傳的陣列型別還是 `number[]`。
 
+<details>
+<summary>參考解答</summary>
+
+讓 TypeScript 依照陣列內容推斷（不手動標注），它會推斷出：
+
+- `cities` → `string[]`
+- `temperatures` → `number[]`
+- `availabilities` → `boolean[]`
+
+試著插入錯誤型別的元素，例如 `cities.push(123)`，TypeScript 會立刻報錯：
+
+```
+Argument of type 'number' is not assignable to parameter of type 'string'.
+```
+
+接著對 `temperatures` 用 `.filter()` 留下 0 度以上的氣溫：
+
+```typescript
+const temperatures = [-5, 0, 18, 35]
+
+const warmEnough = temperatures.filter((temperature) => temperature >= 0)
+// TypeScript 推斷 warmEnough 依然是 number[]，值為 [0, 18, 35]
+```
+
+`.filter()` 只是「挑掉」一些元素，不會改變元素本身的型別，所以回傳的陣列型別跟原陣列一樣是 `number[]`。這部分你也可以自己在終端機用 `npx tsx` 跑一次，或在 VS Code 裡把滑鼠移到 `warmEnough` 上確認型別。
+
+</details>
+
 **練習 2：物件型別**
 
 定義一個物件型別，描述一本書的資訊。這本書有：
@@ -294,6 +322,41 @@ const availabilities = [true, false, true, true]
 - 頁數（一定要有）
 
 建立兩個符合這個型別的物件：一個有 ISBN、一個沒有。確認 TypeScript 兩個都接受。
+
+<details>
+<summary>參考解答</summary>
+
+書名、作者、頁數是必填，ISBN 用 `?` 標成選用屬性。可以先把型別抽出來取個名字（這裡用 `type`），比每個物件都重寫一長串乾淨：
+
+```typescript
+type Book = {
+  title: string
+  author: string
+  isbn?: string
+  pages: number
+}
+
+// 有 ISBN 的書
+const cleanCode: Book = {
+  title: "Clean Code",
+  author: "Robert C. Martin",
+  isbn: "978-0132350884",
+  pages: 464,
+}
+
+// 沒有 ISBN 的書——因為 isbn 是選用的，省略也 OK
+const draftBook: Book = {
+  title: "我的筆記",
+  author: "Alice",
+  pages: 30,
+}
+```
+
+`isbn?` 的型別其實是 `string | undefined`，所以「填字串」或「整個省略不寫」兩種都合法，TypeScript 兩個物件都會接受。但如果你漏寫了 `title`、`author` 或 `pages` 任何一個必填欄位，TypeScript 就會報錯。
+
+> 本章還沒教到 `interface`，這裡先用 `type` 幫物件型別取名字。下一章你會看到用 `interface` 描述物件結構的寫法，在這個情境下兩者效果一樣。
+
+</details>
 
 **練習 3：Tuple 練習**
 
@@ -306,3 +369,32 @@ const availabilities = [true, false, true, true]
 ```
 
 提示：用 `split(",")` 拆開字串，再用 `Number()` 轉換成數字。
+
+<details>
+<summary>參考解答</summary>
+
+用 `split(",")` 把字串拆成兩段，再用 `Number()` 各自轉成數字，回傳型別標注成 `[number, number]` 的 tuple：
+
+```typescript
+function parseCoordinate(input: string): [number, number] {
+  const parts = input.split(",")
+  const x = Number(parts[0])
+  const y = Number(parts[1])
+  return [x, y]
+}
+
+const [x1, y1] = parseCoordinate("10,20")
+// x1: 10, y1: 20（都是 number）
+
+const [x2, y2] = parseCoordinate("-5,100")
+// x2: -5, y2: 100
+```
+
+重點有兩個：
+
+1. 回傳型別寫成 `[number, number]`（tuple），明確表示「一定是兩個數字，第一個是 x、第二個是 y」，比 `number[]` 更精確。
+2. `split(",")` 拆出來的是字串（`"10"`、`"20"`），要用 `Number()` 轉成真正的數字，不然回傳的會是字串，不符合 tuple 的型別。
+
+解構取值時，因為回傳型別是 tuple，TypeScript 知道 `x1`、`y1` 都是 `number`。
+
+</details>

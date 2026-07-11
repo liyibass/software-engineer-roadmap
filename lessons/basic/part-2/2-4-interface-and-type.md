@@ -335,9 +335,106 @@ const laptop: ProductRecord = {
 
 **練習 1**：定義一個 `Book` 介面，包含 `id`（數字）、`title`（字串）、`author`（字串）、`pageCount`（數字）、`isbn`（選填字串）。然後寫一個函式 `describeBook(book: Book): string`，回傳一段描述文字。
 
+<details>
+<summary>參考解答</summary>
+
+`isbn` 後面加個 `?`，代表這欄可填可不填。`describeBook` 裡就得處理「有 ISBN」跟「沒 ISBN」兩種情況，用一個判斷把 ISBN 那段組起來就好：
+
+```typescript
+interface Book {
+  id: number
+  title: string
+  author: string
+  pageCount: number
+  isbn?: string // 「?」代表選填
+}
+
+function describeBook(book: Book): string {
+  const isbnPart = book.isbn ? `，ISBN：${book.isbn}` : ""
+  return `《${book.title}》由 ${book.author} 撰寫，共 ${book.pageCount} 頁${isbnPart}`
+}
+
+const book: Book = {
+  id: 1,
+  title: "TypeScript 入門指南",
+  author: "王小明",
+  pageCount: 320
+  // 沒填 isbn 也不會報錯，因為它是選填的
+}
+
+console.log(describeBook(book))
+// 《TypeScript 入門指南》由 王小明 撰寫，共 320 頁
+```
+
+</details>
+
 **練習 2**：定義一個 `Vehicle` 介面（`brand`、`model`、`year`），再用 `extends` 定義一個 `ElectricVehicle` 介面，加上 `batteryCapacityKwh`（數字）和 `rangeKm`（數字）兩個欄位。建立一個 `ElectricVehicle` 物件，確認 TypeScript 不報錯。
 
+<details>
+<summary>參考解答</summary>
+
+`ElectricVehicle extends Vehicle` 之後，它就自動擁有 `brand`、`model`、`year` 這三個欄位，我們只要補上電動車特有的兩個欄位就好。建立物件時，五個欄位都要填齊（`extends` 繼承來的欄位不是選填，一樣得填）：
+
+```typescript
+interface Vehicle {
+  brand: string
+  model: string
+  year: number
+}
+
+interface ElectricVehicle extends Vehicle {
+  batteryCapacityKwh: number // 電動車特有：電池容量
+  rangeKm: number // 電動車特有：續航里程
+}
+
+const tesla: ElectricVehicle = {
+  brand: "Tesla",
+  model: "Model 3",
+  year: 2024,
+  batteryCapacityKwh: 60,
+  rangeKm: 500
+}
+```
+
+如果你少填其中一個欄位（例如漏掉 `brand`），TypeScript 就會馬上報錯，提醒你「缺了 Vehicle 要求的欄位」。這就是繼承的好處：改 `Vehicle` 的定義，`ElectricVehicle` 也會跟著要求。
+
+</details>
+
 **練習 3**：用 `type` 定義一個 `PaymentMethod`，只允許 `"credit_card" | "bank_transfer" | "crypto"` 三種值。再定義一個 `Payment` 介面，包含 `amount`（數字）、`method`（`PaymentMethod`）、`completedAt`（選填字串）。寫一個函式 `processPayment(payment: Payment): void`，印出付款資訊。
+
+<details>
+<summary>參考解答</summary>
+
+這題剛好把 `type` 跟 `interface` 的分工用上了：付款方式是「三選一的字面值」，用 `type` 定義聯合型別；`Payment` 是「物件形狀」，用 `interface`。`completedAt` 加 `?` 變選填，代表「還沒付款完成時可以不填」：
+
+```typescript
+type PaymentMethod = "credit_card" | "bank_transfer" | "crypto"
+
+interface Payment {
+  amount: number
+  method: PaymentMethod
+  completedAt?: string // 選填：尚未完成時可以不填
+}
+
+function processPayment(payment: Payment): void {
+  const status = payment.completedAt
+    ? `已於 ${payment.completedAt} 完成`
+    : "尚未完成"
+  console.log(
+    `付款金額：${payment.amount}，付款方式：${payment.method}，狀態：${status}`
+  )
+}
+
+processPayment({ amount: 1000, method: "credit_card", completedAt: "2025-07-11" })
+// 付款金額：1000，付款方式：credit_card，狀態：已於 2025-07-11 完成
+
+processPayment({ amount: 500, method: "crypto" })
+// 付款金額：500，付款方式：crypto，狀態：尚未完成
+```
+
+好處是：如果你手滑打成 `method: "cash"`，因為 `"cash"` 不在 `PaymentMethod` 允許的三種值裡，TypeScript 會立刻報錯，不用等到執行時才發現。
+
+</details>
 
 ---
 

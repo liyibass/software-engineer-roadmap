@@ -157,6 +157,148 @@ public class UserServiceTests
 2. 用 `[Theory]` + `[InlineData]` 為一個方法寫多組案例的測試。
 3. 用 Moq 為一個「依賴介面的服務」寫測試——設定假依賴的行為，驗證服務邏輯，全程不碰真依賴。
 
+<details>
+<summary>參考解答</summary>
+
+**1. 為純方法寫 xUnit 測試（AAA）**
+
+先假設有這樣一個純邏輯類別（相同輸入永遠給相同輸出、不改外部狀態，最好測）：
+
+```csharp
+public class MathUtils
+{
+    public int Add(int a, int b) => a + b;
+    public int Square(int n) => n * n;
+}
+```
+
+對應的測試，每個都照 Arrange / Act / Assert 三段寫：
+
+```csharp
+public class MathUtilsTests
+{
+    [Fact]
+    public void Add_TwoPositives_ReturnsSum()
+    {
+        // Arrange
+        var math = new MathUtils();
+
+        // Act
+        var result = math.Add(2, 3);
+
+        // Assert
+        Assert.Equal(5, result);
+    }
+
+    [Fact]
+    public void Add_NegativeAndPositive_ReturnsSum()
+    {
+        var math = new MathUtils();
+        var result = math.Add(-4, 10);
+        Assert.Equal(6, result);
+    }
+
+    [Fact]
+    public void Square_Three_ReturnsNine()
+    {
+        var math = new MathUtils();
+        var result = math.Square(3);
+        Assert.Equal(9, result);
+    }
+}
+```
+
+跑法：在測試專案裡 `dotnet test`。看到 `Passed!` 就代表三個測試都綠。
+（動手題——請自行實機執行 `dotnet test` 確認全綠，這裡看不到你的畫面。）
+
+**2. 用 `[Theory]` + `[InlineData]` 寫多組案例**
+
+同一個測試邏輯，只是輸入不同，就用 `[Theory]`＋多個 `[InlineData]`，不必複製貼上寫好幾個 `[Fact]`：
+
+```csharp
+public class MathUtilsTheoryTests
+{
+    [Theory]
+    [InlineData(2, 3, 5)]      // 正 + 正
+    [InlineData(-4, 10, 6)]    // 負 + 正
+    [InlineData(0, 0, 0)]      // 邊界：兩個 0
+    [InlineData(-1, -1, -2)]   // 負 + 負
+    public void Add_VariousCases_ReturnsExpectedSum(int a, int b, int expected)
+    {
+        var math = new MathUtils();
+        var result = math.Add(a, b);
+        Assert.Equal(expected, result);
+    }
+}
+```
+
+每一行 `[InlineData]` 就是一個案例，xUnit 會把它們當成 4 個獨立測試分別跑、分別報綠紅——省下重複程式碼，又能一眼看出涵蓋了哪些情況。
+
+**3. 用 Moq 為「依賴介面的服務」寫測試**
+
+假設有這個服務，它依賴 `IUserRepository` 介面（不直接依賴真資料庫，就是為了好測，呼應 [csharp-4-4]）：
+
+```csharp
+public interface IUserRepository
+{
+    User? FindById(int id);
+}
+
+public class UserService
+{
+    private readonly IUserRepository _repo;
+    public UserService(IUserRepository repo) => _repo = repo;
+
+    // 業務邏輯：找不到就丟例外，找到就回名字
+    public string GetUserName(int id)
+    {
+        var user = _repo.FindById(id);
+        if (user == null)
+            throw new KeyNotFoundException($"找不到 ID 為 {id} 的使用者");
+        return user.Name;
+    }
+}
+```
+
+測試時用 Moq 造一個「假的 repository」，設定它的行為，全程不碰真資料庫：
+
+```csharp
+public class UserServiceTests
+{
+    [Fact]
+    public void GetUserName_WhenUserExists_ReturnsName()
+    {
+        // Arrange：假 repo，設定「查 id=1 回一個假 user」
+        var mockRepo = new Mock<IUserRepository>();
+        mockRepo.Setup(r => r.FindById(1))
+                .Returns(new User { Id = 1, Name = "Amy" });
+        var service = new UserService(mockRepo.Object);
+
+        // Act
+        var name = service.GetUserName(1);
+
+        // Assert
+        Assert.Equal("Amy", name);
+    }
+
+    [Fact]
+    public void GetUserName_WhenUserNotFound_ThrowsKeyNotFound()
+    {
+        // Arrange：設定「查 id=99 回 null」（模擬查無此人）
+        var mockRepo = new Mock<IUserRepository>();
+        mockRepo.Setup(r => r.FindById(99)).Returns((User?)null);
+        var service = new UserService(mockRepo.Object);
+
+        // Act + Assert：該丟 KeyNotFoundException
+        Assert.Throws<KeyNotFoundException>(() => service.GetUserName(99));
+    }
+}
+```
+
+重點：`mockRepo.Setup(...).Returns(...)` 讓你**自己決定假依賴的回傳**，於是同一個服務可以輕鬆測「查得到」和「查不到」兩條路，而且**完全不需要真的資料庫**——快、穩、只測到 `UserService` 自己的邏輯。這正是「依賴介面 + 注入」讓測試變好寫的地方。
+
+</details>
+
 ## 課外讀物
 
 > 單元測試、AAA 原則 → [課外讀物 E-9-3：單元測試](../../../課外讀物/E-9-testing/E-9-3-unit-testing.md)、[課外讀物 E-9-4：AAA 原則](../../../課外讀物/E-9-testing/E-9-4-aaa-principle.md)

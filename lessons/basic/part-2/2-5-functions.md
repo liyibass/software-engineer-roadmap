@@ -353,7 +353,53 @@ console.log(result)  // "[HELLOWORLD]"
 
 **練習 1**：寫一個純函式 `celsiusToFahrenheit(celsius: number): number`，把攝氏溫度轉換成華氏（公式：`(celsius × 9/5) + 32`）。確認它是純函式：對同樣的輸入永遠回傳同樣的輸出，且不修改任何外部狀態。
 
+<details>
+<summary>參考解答</summary>
+
+直接把公式翻成程式碼就好。要注意的是它為什麼是純函式：它只用了傳進來的 `celsius`，沒有讀外部變數、沒有讀「現在時間」，也沒有改動函式外面的任何東西——所以同樣輸入永遠得到同樣輸出。
+
+```typescript
+function celsiusToFahrenheit(celsius: number): number {
+  return (celsius * 9) / 5 + 32
+}
+
+console.log(celsiusToFahrenheit(0)) // 32
+console.log(celsiusToFahrenheit(100)) // 212
+console.log(celsiusToFahrenheit(37)) // 98.6
+```
+
+驗證純不純的小技巧：`celsiusToFahrenheit(0)` 不管你呼叫幾次、什麼時候呼叫，答案永遠是 `32`。這種「可預測」正是純函式好測試、好推理的原因。
+
+</details>
+
 **練習 2**：定義一個 `type Validator = (value: string) => boolean`。然後寫三個符合這個型別的函式：`isNotEmpty`（不為空字串）、`isValidEmail`（包含 `@`）、`isLongEnough`（長度至少 8 個字元）。最後寫一個 `validate(value: string, validators: Validator[]): boolean` 函式，只有當所有 validator 都回傳 `true` 時才回傳 `true`。
+
+<details>
+<summary>參考解答</summary>
+
+三個 validator 都符合 `Validator` 這個「接受字串、回傳布林」的形狀，所以型別標成 `Validator` 就好，參數 `value` 的型別會自動推斷出來。最後的 `validate` 只有在「每一個」validator 都通過時才算通過——陣列的 `every` 剛好就是這個語意（全部為 `true` 才回傳 `true`）：
+
+```typescript
+type Validator = (value: string) => boolean
+
+const isNotEmpty: Validator = (value) => value.trim() !== ""
+const isValidEmail: Validator = (value) => value.includes("@")
+const isLongEnough: Validator = (value) => value.length >= 8
+
+function validate(value: string, validators: Validator[]): boolean {
+  return validators.every((validator) => validator(value))
+}
+
+const rules = [isNotEmpty, isValidEmail, isLongEnough]
+
+console.log(validate("alice@example.com", rules)) // true（三個規則都通過）
+console.log(validate("a@b", rules)) // false（長度不足 8）
+console.log(validate("        ", rules)) // false（trim 後是空字串）
+```
+
+每個 validator 都只做一件事（一個檢查一種規則），要新增規則時只要再寫一個符合 `Validator` 型別的函式丟進陣列，不用改到 `validate` 本身。
+
+</details>
 
 **練習 3**：下面的函式違反了「一個函式只做一件事」的原則，請把它拆分成多個小函式，再用一個上層函式組合起來：
 
@@ -374,6 +420,49 @@ function handleBlogPost(title: string, content: string, authorEmail: string): vo
   console.log(`通知 ${authorEmail}：你的文章已發布`)
 }
 ```
+
+<details>
+<summary>參考解答</summary>
+
+原本的函式一口氣做了四件事：驗證標題、驗證內容、儲存、通知。把它們各自拆成一個小函式，每個名字都精準描述自己在幹嘛，再用一個上層的 `handleBlogPost` 把流程串起來：
+
+```typescript
+function validateBlogTitle(title: string): void {
+  if (title.trim() === "") {
+    throw new Error("標題不能為空")
+  }
+}
+
+function validateBlogContent(content: string): void {
+  if (content.length < 100) {
+    throw new Error("內容太短，至少需要 100 個字")
+  }
+}
+
+function saveBlogPost(title: string): void {
+  console.log(`儲存文章：${title}`)
+}
+
+function notifyAuthor(authorEmail: string): void {
+  console.log(`通知 ${authorEmail}：你的文章已發布`)
+}
+
+// 上層函式：只負責「按順序組合」這些小函式
+function handleBlogPost(
+  title: string,
+  content: string,
+  authorEmail: string
+): void {
+  validateBlogTitle(title)
+  validateBlogContent(content)
+  saveBlogPost(title)
+  notifyAuthor(authorEmail)
+}
+```
+
+拆完之後的好處：想單獨測「標題驗證」可以直接測 `validateBlogTitle`，不用連帶跑到儲存跟通知；驗證規則改了，也只要動對應那個小函式。上層的 `handleBlogPost` 讀起來就像一份流程清單，一眼看懂整個步驟。
+
+</details>
 
 ---
 

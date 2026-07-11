@@ -125,11 +125,35 @@ Pod（實際跑容器，IP 會變、用完即丟）
 
 回答：Pod 的 IP 為什麼會變？這造成什麼問題？Service 怎麼解決它？用「員工換座位 vs 部門分機」的類比說明。
 
+<details>
+<summary>參考解答</summary>
+
+**Pod 的 IP 為什麼會變**：Pod 是「用完即丟」的——掛了會被重建、擴縮時會增減。每個 Pod 啟動時才拿到一個 IP，**重建後就換一個新 IP**（呼應 SRE/infra 的「機器是牲畜、可拋棄」，不是養在那的寵物）。
+
+**造成什麼問題**：如果別的服務「直接記住某個 Pod 的 IP 去連它」，那個 Pod 一重建、IP 一變，連線就斷了、找不到人。所以「用 Pod IP 直連」是不可靠的。
+
+**Service 怎麼解決**：Service 提供一個「**穩定不變的位址（名字 + 虛擬 IP）**」，背後對應一組會變動的 Pod。其他服務只連 Service，Service 自動把流量導到當前健康的 Pod（順便做負載平衡）。
+
+**類比**：Pod 像「**會換座位的員工**」（IP 一直變），Service 像「**部門的總機分機號碼**」（固定不變）。你打分機找「業務部」，不用管現在是哪個員工接、他坐哪一格——總機自動幫你轉接給還在位的人。分機號碼永遠不變，員工怎麼換座位、進進出出都沒關係。
+
+</details>
+
 ---
 
 ### 練習 2：三層角色
 
 用一句話分別說明 Pod、Service、Ingress 的角色。Ingress 類似你 Part 6 學的哪個服務？
+
+<details>
+<summary>參考解答</summary>
+
+- **Pod**：K8s 最小的部署單位，包著你的應用容器、實際跑起來的東西（IP 會變、用完即丟）。
+- **Service**：給一組會變動的 Pod 一個「穩定不變的內部位址」，讓別人靠名字就找得到、並自動負載平衡到健康的 Pod。
+- **Ingress**：外部流量進入叢集的入口，依網址路徑 / 網域把外部請求路由到對應的 Service。
+
+**Ingress 類似 Part 6 的哪個服務**：**ALB（Application Load Balancer，aws-6-4）**——都是「依路徑分流的反向代理 / 入口」。事實上在 EKS，Ingress 背後常常就是用 ALB 實現的（透過 AWS Load Balancer Controller）：你定義 Ingress，它自動幫你建一個 ALB。
+
+</details>
 
 ---
 
@@ -139,6 +163,17 @@ Pod（實際跑容器，IP 會變、用完即丟）
 
 1. K8s 的 CoreDNS（用名字找 Service），和你 infra Part 5-4 學的什麼很像？
 2. EKS 的 Pod IP 來自哪裡？這為什麼影響 VPC 的 IP 規劃（aws-4-2）？
+
+<details>
+<summary>參考解答</summary>
+
+**1. CoreDNS 像 infra Part 5-4 的什麼**：像 **Docker Compose 的「服務名互連」**。CoreDNS 是 K8s 內部的 DNS，讓 Pod 用「Service 的名字」（例如連 `my-api`）就找到對應的 Service，不用管背後 Pod 的 IP。這跟 Compose 裡「用服務名（container name）互相連」是同一個精神——**靠名字找服務、不靠會變的 IP**（也呼應 infra Part 3-1 的 DNS：把名字解析成位址）。
+
+**2. Pod IP 來自哪裡、為什麼影響 VPC 規劃**：在 EKS，Pod 的 IP **直接來自你的 VPC 的 CIDR**（aws-4-2），這叫 **VPC CNI**。意思是每個 Pod 都像 VPC 裡的「一等公民」，拿一個真正的 VPC 內 IP，能和其他 AWS 資源直接通訊。
+
+因為這樣，**每多一個 Pod 就吃掉一個 VPC 的 IP**。當 Pod 很多（大量微服務、擴縮上去）時會消耗大量 IP，所以規劃 VPC 時 **CIDR 的 IP 範圍要留得夠大**（aws-4-2）——不然 IP 用光了，新 Pod 就配不到 IP、起不來。這就是「Pod IP 來自 VPC」直接影響「VPC IP 要規劃夠大」的原因。
+
+</details>
 
 ## 課外讀物
 

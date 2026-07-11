@@ -320,6 +320,25 @@ merge(defaultConfig, userOverride)
 
 **練習 1**：寫一個泛型函式 `last<T>(arr: T[]): T | undefined`，回傳陣列的最後一個元素。如果陣列是空的，回傳 `undefined`。用字串陣列和數字陣列分別測試。
 
+<details>
+<summary>參考解答</summary>
+
+用 `<T>` 宣告型別參數，輸入是 `T[]`、輸出是 `T | undefined`（因為空陣列時取不到值）。剛好 JavaScript 存取超出範圍的索引（例如空陣列的 `arr[-1]`）會自動得到 `undefined`，所以不用特別寫 `if` 判斷，回傳型別 `T | undefined` 也如實反映了這件事：
+
+```typescript
+function last<T>(arr: T[]): T | undefined {
+  return arr[arr.length - 1]
+}
+
+console.log(last(["Alice", "Bob", "Carol"])) // "Carol"（T 推斷為 string）
+console.log(last([10, 20, 30])) // 30（T 推斷為 number）
+console.log(last([])) // undefined
+```
+
+注意 TypeScript 會自動推斷 `T`：傳字串陣列進去，回傳型別就是 `string | undefined`；傳數字陣列，就是 `number | undefined`。一個函式適用所有型別，型別資訊還完整保留——這就是泛型比 `any` 強的地方。
+
+</details>
+
 **練習 2**：定義一個泛型介面 `PaginatedResponse<T>`，包含以下欄位：
 - `items`：型別為 `T[]`（資料清單）
 - `total`：數字（總筆數）
@@ -327,6 +346,40 @@ merge(defaultConfig, userOverride)
 - `pageSize`：數字（每頁筆數）
 
 然後定義一個 `Product` 介面（至少包含 `id`、`name`、`price`），建立一個 `PaginatedResponse<Product>` 物件，確認 TypeScript 不報錯。
+
+<details>
+<summary>參考解答</summary>
+
+這題跟章節裡的 `ApiResponse<T>` 是同一個套路：分頁回應的「外殼」（總筆數、頁碼、每頁筆數）是固定的，只有 `items` 裡裝什麼會變，所以把它留成型別參數 `T`。用的時候填入 `Product`，`items` 就自動變成 `Product[]`：
+
+```typescript
+interface PaginatedResponse<T> {
+  items: T[] // 這一塊的型別等使用時才決定
+  total: number
+  page: number
+  pageSize: number
+}
+
+interface Product {
+  id: number
+  name: string
+  price: number
+}
+
+const productPage: PaginatedResponse<Product> = {
+  items: [
+    { id: 1, name: "鍵盤", price: 2000 },
+    { id: 2, name: "滑鼠", price: 800 }
+  ],
+  total: 42,
+  page: 1,
+  pageSize: 10
+}
+```
+
+如果你在 `items` 裡放了不符合 `Product` 形狀的東西（例如漏了 `price`），TypeScript 就會報錯。想換成使用者清單？直接寫 `PaginatedResponse<User>` 就好，同一個介面重複使用，不必再定義一份。
+
+</details>
 
 **練習 3**：寫一個泛型函式 `findByProperty<T>(items: T[], key: keyof T, value: T[keyof T]): T | undefined`，從陣列中找到第一個符合條件的項目。
 
@@ -351,3 +404,39 @@ const users: User[] = [
 findByProperty(users, "name", "Bob")  // 應該回傳 Bob 的資料
 findByProperty(users, "id", 1)        // 應該回傳 Alice 的資料
 ```
+
+<details>
+<summary>參考解答</summary>
+
+函式本體其實很短，用陣列的 `find` 把「第一個 `item[key]` 等於 `value` 的項目」挑出來就好。重點在型別：`key: keyof T` 保證你只能傳 `T` 真的有的欄位名稱（傳 `"age"` 進 `User` 會被擋下來），`value: T[keyof T]` 則代表值必須是 `T` 某個欄位的型別：
+
+```typescript
+function findByProperty<T>(
+  items: T[],
+  key: keyof T,
+  value: T[keyof T]
+): T | undefined {
+  return items.find((item) => item[key] === value)
+}
+
+interface User {
+  id: number
+  name: string
+  email: string
+}
+
+const users: User[] = [
+  { id: 1, name: "Alice", email: "alice@example.com" },
+  { id: 2, name: "Bob", email: "bob@example.com" }
+]
+
+console.log(findByProperty(users, "name", "Bob"))
+// { id: 2, name: "Bob", email: "bob@example.com" }
+
+console.log(findByProperty(users, "id", 1))
+// { id: 1, name: "Alice", email: "alice@example.com" }
+```
+
+`keyof T` 跟 `T[keyof T]` 的組合讓這個函式「通用但不失守」：它適用任何型別的陣列，同時又不允許你查一個根本不存在的欄位。這比用 `any` 硬幹安全太多——`any` 會讓 `key` 打錯字也沒人提醒你。
+
+</details>

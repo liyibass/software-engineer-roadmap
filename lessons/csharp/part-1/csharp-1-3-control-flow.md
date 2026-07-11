@@ -113,6 +113,73 @@ foreach (var fruit in fruits)
 2. 用「switch 表達式」寫一個函式，輸入月份數字（1-12），回傳季節（春夏秋冬）。
 3. 用 `foreach` 走訪一個水果陣列，算出總共有幾個字（每個水果名長度相加）。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：for 印 1 到 10，判斷奇偶**
+
+判斷奇偶的關鍵是「除以 2 的餘數」——用 `%`（取餘數運算子）。餘數為 0 就是偶數，否則是奇數：
+
+```csharp
+for (int i = 1; i <= 10; i++)
+{
+    if (i % 2 == 0)
+    {
+        Console.WriteLine($"{i} 是偶數");
+    }
+    else
+    {
+        Console.WriteLine($"{i} 是奇數");
+    }
+}
+```
+
+注意迴圈條件用 `i <= 10`（含 10），從 `i = 1` 開始。輸出會是「1 是奇數、2 是偶數 …… 10 是偶數」。
+
+**練習 2：用 switch 表達式，月份數字回傳季節**
+
+這裡示範用 switch 表達式的「模式合併」（`or`）把多個月份歸到同一季。以北半球常見的分法（3-5 春、6-8 夏、9-11 秋、12/1/2 冬）：
+
+```csharp
+string GetSeason(int month)
+{
+    return month switch
+    {
+        3 or 4 or 5   => "春",
+        6 or 7 or 8   => "夏",
+        9 or 10 or 11 => "秋",
+        12 or 1 or 2  => "冬",
+        _ => "無效的月份",   // 1-12 以外
+    };
+}
+
+Console.WriteLine(GetSeason(4));    // 春
+Console.WriteLine(GetSeason(8));    // 夏
+Console.WriteLine(GetSeason(13));   // 無效的月份
+```
+
+`_` 是「其餘所有情況」，用來接住不在 1-12 範圍內的輸入，避免漏掉狀況。季節怎麼分是開放的（也有人把 12-2 當冬），只要邏輯一致、有處理無效輸入即可。
+
+**練習 3：foreach 算水果名總字數**
+
+用一個累加變數 `totalLength`，每次迴圈把當前水果名的長度（`.Length`）加上去：
+
+```csharp
+string[] fruits = { "蘋果", "香蕉", "橘子" };
+int totalLength = 0;
+
+foreach (var fruit in fruits)
+{
+    totalLength += fruit.Length;   // 每個名字的字數累加
+}
+
+Console.WriteLine($"總共 {totalLength} 個字");   // 總共 6 個字
+```
+
+三個水果各 2 個字，相加是 6。這裡用 `foreach` 最自然——我們只想「一個個走訪元素」，不需要索引，也就不會有算錯索引而越界的風險。
+
+</details>
+
 ## 課外讀物
 
 > 邏輯運算（&&、||、!）的底層 → **cs 課程 Part 2-1：邏輯閘**

@@ -172,6 +172,43 @@ systemctl status hello        # 過一兩秒再看，它又 active (running) 了
 
 從第一步做到第五步，建立你自己的 `hello` 服務並驗證它能自動重啟。每一步都對照「這在解決上一章說的哪個問題（常駐 / 重啟 / 開機自啟）」。
 
+<details>
+<summary>參考解答</summary>
+
+這是動手題，需要你**在自己的伺服器上實機做一遍**。完整流程照本章的五步走：
+
+```bash
+# 第一步：準備示範程式
+vi /home/deploy/hello-service.sh          # 貼入本章那段 while true 迴圈
+chmod +x /home/deploy/hello-service.sh    # 給執行權限
+
+# 第二步：寫 service 檔
+sudo vi /etc/systemd/system/hello.service # 貼入 [Unit][Service][Install] 三段
+
+# 第三步：讓 systemd 認得它
+sudo systemctl daemon-reload
+sudo systemctl enable --now hello
+systemctl status hello                     # 應看到 active (running)
+
+# 第四步：看日誌
+journalctl -u hello -f                     # 應看到每 10 秒一行 Hello...，Ctrl+C 離開
+
+# 第五步：驗證自動重啟
+systemctl status hello                      # 記下 Main PID
+sudo kill 那個PID
+systemctl status hello                      # 過一兩秒再看，又 running 了，且 PID 變了
+```
+
+**每一步對照解決哪個問題：**
+
+- `.service` 檔本身 + `ExecStart` 交給 systemd 在背景跑 → 解決「**背景常駐**」（不再綁在你的終端機，登出也不會死）。
+- `Restart=always` → 解決「**掛掉自動重啟**」（第五步砍掉行程後它自己活過來，就是在驗證這一條）。
+- `WantedBy=multi-user.target` + `enable` → 解決「**開機自動啟動**」（重開機也會自己起來，練習 2 驗證這一條）。
+
+**驗收點**：第五步砍掉 PID 後，再看 status 仍是 `active (running)` 且 **Main PID 是一個新數字**——這就證明 systemd 幫你把死掉的服務自動重啟了。
+
+</details>
+
 ---
 
 ### 練習 2：驗證「開機自動啟動」
@@ -179,6 +216,26 @@ systemctl status hello        # 過一兩秒再看，它又 active (running) 了
 如果你願意，重開機你的伺服器（`sudo reboot`），等它起來後重新 SSH 進去，跑 `systemctl status hello`。它應該**不用你手動啟動就自己在跑**了——這就是 `enable` 的效果。
 
 > 注意：重開機會中斷你所有連線，確定現在重啟沒問題再做。
+
+<details>
+<summary>參考解答</summary>
+
+這題要**實機重開機驗證**，做法：
+
+```bash
+sudo reboot          # 送出後你的 SSH 連線會斷掉，這是正常的
+# 等約 30 秒到一兩分鐘，讓伺服器開機完成
+ssh deploy@你的伺服器IP   # 重新連進去
+systemctl status hello   # 關鍵：不用你 start，它就已經是 active (running)
+```
+
+**為什麼它會自己跑起來？** 因為你先前用 `enable --now` 時的 `enable`，把 `hello` 掛到了 `multi-user.target`（正常開機階段）。開機時 systemd 走到這個階段，就會照名單把 `hello` 自動拉起來——這正是上一章「`start` 是這一次、`enable` 是每一次」的實際驗證。
+
+**驗收點**：重開機後，**沒有手動下任何 start 指令**，`systemctl status hello` 就顯示 `active (running)`。如果它是 `inactive (dead)`，代表你當初可能只 `start` 沒 `enable`，補一個 `sudo systemctl enable hello` 即可。
+
+（如果你不方便重開機——例如這台機器上還有別的服務不能中斷——可以先跳過，等 Part 4-5 部署正式網站時一起驗證。）
+
+</details>
 
 ---
 
@@ -193,6 +250,28 @@ sudo systemctl daemon-reload
 ```
 
 想想看：這三行分別在做什麼？（提示：停用+停止、刪設定檔、請總管重讀。）
+
+<details>
+<summary>參考解答</summary>
+
+三行各自的作用，順序不能顛倒：
+
+1. **`sudo systemctl disable --now hello`**
+   - `disable`：把 `hello` 從「開機自動啟動」名單移除（以後重開機不再自己起來）。
+   - `--now`：順便「現在就停止它」（等於同時做了 `stop`）。
+   - 一句話：先讓服務**停下來、而且以後也別再自己起來**。要先做這步，不然你等一下刪了設定檔、它卻還在記憶體裡跑，狀態會很混亂。
+
+2. **`sudo rm /etc/systemd/system/hello.service`**
+   - 刪掉那份 `.service` 設定檔本身。服務已經停了，這一步是把「工作說明書」也丟掉，systemd 之後就再也找不到這個服務的定義。
+
+3. **`sudo systemctl daemon-reload`**
+   - 請總管「重新看一遍所有工作說明書」。因為你剛剛刪了一份設定檔，要讓 systemd 重新掃描、把 `hello` 從它記憶中的清單裡拿掉，狀態才乾淨。
+
+**順序邏輯**：先停服務 → 再刪設定檔 → 最後叫 systemd 重讀。就像退租：先把人搬出去、再撕掉合約、最後通知房東更新名冊。
+
+**驗收點**：三行跑完後，`systemctl status hello` 會顯示找不到這個 unit（`Unit hello.service could not be found`），代表清乾淨了。
+
+</details>
 
 ## 課外讀物
 

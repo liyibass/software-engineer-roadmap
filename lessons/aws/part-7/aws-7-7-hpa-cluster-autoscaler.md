@@ -144,17 +144,51 @@ K8s 把「擴縮」拆成 Pod 和 Node 兩層，更精細——能「先盡量�
 
 回答：HPA 和 Cluster Autoscaler 各自增減什麼？為什麼 K8s 的擴縮需要分這兩層？
 
+<details>
+<summary>參考解答</summary>
+
+**各自增減什麼**：
+
+- **HPA（Horizontal Pod Autoscaler）**：增減 **Pod（容器）的數量**。看指標（如平均 CPU），流量大就多開 Pod、流量小就減少。管的是「容器層」——應用要幾份。
+- **Cluster Autoscaler**：增減 **Node（機器）的數量**。看「Pod 排得下排不下」，有 Pod 因資源不夠卡在 Pending 就加 Node，有 Node 太閒就移除。管的是「機器層」——要幾台機器來裝這些 Pod。
+
+**為什麼要分兩層**：因為 K8s 本來就有「Pod」和「Node」兩個層次（aws-7-5），而它們的擴縮訴求不同：光加 Pod，如果機器不夠，Pod 也排不進去（會 Pending）；光加機器，如果沒有多開 Pod，加了也沒東西跑。分兩層才能各司其職、又能配合——**先盡量把 Pod 塞進現有機器（省錢），真的不夠了才加機器**。這比「一層搞定」更精細也更省成本。
+
+</details>
+
 ---
 
 ### 練習 2：為什麼缺一不可
 
 回答：如果只有 HPA（沒有 Cluster Autoscaler），流量暴增、現有機器資源不夠時，會發生什麼？
 
+<details>
+<summary>參考解答</summary>
+
+會**卡住**：流量暴增 → Pod 的 CPU 飆高 → HPA 觸發、想把 Pod 從 2 個擴到 8 個。但這些新 Pod 要跑在 Node 上，而現有 Node 的資源已經不夠了——於是多出來的 Pod **排不進任何 Node，卡在 Pending 狀態**（起不來）。
+
+結果：**HPA 以為自己擴出去了，實際上新 Pod 根本沒在跑**，負載沒有真正被分攤，服務照樣被流量壓垮。這時光有 HPA 沒用，你需要**更多 Node**——也就是 **Cluster Autoscaler** 偵測到有 Pod Pending、自動加機器，Pending 的 Pod 才排得進去跑起來。所以兩層**缺一不可**：HPA 決定「要幾個容器」，Cluster Autoscaler 確保「有足夠機器來跑這些容器」。
+
+（例外：若用 **Fargate** 跑 Pod，就沒有這個問題——見下一題。）
+
+</details>
+
 ---
 
 ### 練習 3：Fargate 的差別
 
 回答：如果用 Fargate 跑 Pod，為什麼就不需要 Cluster Autoscaler 了？
+
+<details>
+<summary>參考解答</summary>
+
+因為 **Cluster Autoscaler 的工作是「增減 Node（機器）」，而用 Fargate 就沒有需要你管理的 Node 了**。
+
+Fargate 是「不用管機器」的模式（aws-7-3）——AWS 會**自動幫每一個 Pod 準備剛好的運算資源**來跑。所以永遠不會發生「Pod 想跑、但現有 Node 資源不夠、排不進去」的情況（那正是 Cluster Autoscaler 要解決的問題）。既然沒有「一群固定的 Node 要增增減減」，自然就不需要 Cluster Autoscaler。
+
+結果是：用 Fargate 時，**兩層擴縮簡化成一層**——你只要用 **HPA 管 Pod 數量**就好，「機器夠不夠」由 AWS 在背後自動搞定。這又是 Fargate「不管機器」帶來的好處。
+
+</details>
 
 ## 課外讀物
 

@@ -382,6 +382,61 @@ $ npx tsx todo.ts clear
 
 （提示：先算好要清除幾個，再過濾，這樣才能印出數量）
 
+<details>
+<summary>參考解答</summary>
+
+這題分兩步：先在 `commands.ts` 加一個純函式，再回 `todo.ts` 的 `switch` 接上指令。
+
+**Step 1：在 `commands.ts` 新增 `clearDone`**
+
+它跟 `deleteTodo` 很像，都是用 `.filter()` 篩掉不要的項目——只是這次的條件是「還沒完成的才留下」，也就是 `!todo.isDone`：
+
+```typescript
+// commands.ts
+export function clearDone(todos: Todo[]): Todo[] {
+  // 只保留「還沒完成」的任務，等於把 isDone === true 的都清掉
+  return todos.filter((todo) => !todo.isDone)
+}
+```
+
+一樣是純函式：它不改原本的 `todos`，而是回傳一個新的陣列。
+
+**Step 2：在 `todo.ts` 接上 `case "clear"`**
+
+要印出「清除了幾個」，關鍵在提示講的：**先數、再清**。因為清完之後那些已完成的任務就不見了，你就數不到了。所以我們先用 `.filter().length` 算出有幾個已完成，再呼叫 `clearDone`：
+
+```typescript
+// todo.ts
+// 記得在最上面的 import 補上 clearDone
+import { addTodo, markDone, deleteTodo, listTodos, clearDone } from "./commands"
+
+// ...switch 裡面新增這個 case：
+  case "clear": {
+    // 先數好有幾個已完成，等一下清掉就數不到了
+    const doneCount = todos.filter((todo) => todo.isDone).length
+    const updated = clearDone(todos)
+    saveTodos(updated)
+    console.log(`🧹 已清除 ${doneCount} 個已完成的任務`)
+    break
+  }
+```
+
+**驗收點**（這題需要你自己在終端機實機驗證）：
+
+```bash
+$ npx tsx todo.ts add "買牛奶"
+$ npx tsx todo.ts add "寫作業"
+$ npx tsx todo.ts list          # 先看目前的 id
+$ npx tsx todo.ts done <買牛奶的id>
+$ npx tsx todo.ts clear
+🧹 已清除 1 個已完成的任務
+$ npx tsx todo.ts list          # 剩下「寫作業」，且 todos.json 裡也真的少了一筆
+```
+
+如果全部都還沒完成就下 `clear`，應該會印出「已清除 0 個」，而且清單完全不變——順便驗證一下這個邊界情況。
+
+</details>
+
 ---
 
 **練習 2 — 新增 `search` 指令**
@@ -400,6 +455,65 @@ export function searchTodos(todos: Todo[], keyword: string): Todo[]
 ```
 
 提示：`String.prototype.includes()` 可以檢查是否包含子字串。如果要不分大小寫，可以把兩邊都轉 `.toLowerCase()` 再比較。
+
+<details>
+<summary>參考解答</summary>
+
+跟練習 1 一樣是「加一個純函式 + 接一個 case」，只是這次多了「不分大小寫」的小細節。
+
+**Step 1：在 `commands.ts` 新增 `searchTodos`**
+
+不分大小寫的訣竅是：**比較之前，把兩邊都轉成小寫**。這樣 `"牛奶"`、`"Milk"`、`"MILK"` 就會用同一個標準去比對（中文沒有大小寫，但如果任務裡混了英文就派得上用場）：
+
+```typescript
+// commands.ts
+export function searchTodos(todos: Todo[], keyword: string): Todo[] {
+  // 關鍵字先轉小寫，避免在迴圈裡每次都轉，順便讓意圖更清楚
+  const lowerKeyword = keyword.toLowerCase()
+  // 留下 title（也轉小寫）包含關鍵字的任務
+  return todos.filter((todo) => todo.title.toLowerCase().includes(lowerKeyword))
+}
+```
+
+**Step 2：在 `todo.ts` 接上 `case "search"`**
+
+搜尋關鍵字可能有空格（例如 `search "買 牛奶"`），所以跟 `add` 一樣用 `args.join(" ")` 把它合回一個字串。搜尋完先印出「幾筆」，再重用現成的 `listTodos` 把結果印出來——不用重寫印清單的邏輯：
+
+```typescript
+// todo.ts
+// import 補上 searchTodos
+import { addTodo, markDone, deleteTodo, listTodos, searchTodos } from "./commands"
+
+// ...switch 裡面新增這個 case：
+  case "search": {
+    const keyword = args.join(" ")
+    if (!keyword) {
+      console.log("請提供搜尋關鍵字，例如：todo.ts search \"牛奶\"")
+      break
+    }
+    const results = searchTodos(todos, keyword)
+    console.log(`搜尋結果（${results.length} 筆）：`)
+    listTodos(results)  // 重用 listTodos，沒結果時它會印「目前沒有任何任務」
+    break
+  }
+```
+
+注意 `search` 只是「讀」資料、不改資料，所以這個 case **不需要** `saveTodos`——這也呼應了本章「每個指令職責清楚」的精神。
+
+**驗收點**（這題需要你自己在終端機實機驗證）：
+
+```bash
+$ npx tsx todo.ts add "買牛奶"
+$ npx tsx todo.ts add "寫作業"
+$ npx tsx todo.ts search "牛奶"
+搜尋結果（1 筆）：
+1. [ ] 買牛奶
+$ npx tsx todo.ts search "沒有這個"
+搜尋結果（0 筆）：
+目前沒有任何任務
+```
+
+</details>
 
 ---
 
@@ -420,3 +534,55 @@ $ npx tsx todo.ts delete 2
 - 修改 `addTodo` 函式的簽名，讓它能接收「目前所有 todos」以計算下一個 id
 
 （提示：`Math.max(...todos.map(t => t.id))` 可以找出目前最大的 id，但要記得處理 `todos` 為空的情況）
+
+<details>
+<summary>參考解答</summary>
+
+好消息是：本章的 `addTodo` 簽名**本來就已經收了 `todos`**（`addTodo(todos: Todo[], title: string)`），所以我們不用改簽名，也不用動 `todo.ts` 的呼叫端——只要把「怎麼算 id」這一行換掉就好。
+
+**要改的只有 `commands.ts` 裡 `addTodo` 算 id 的那一行**
+
+原本是 `id: Date.now()`，現在改成「目前最大的 id + 1」。這裡有個一定要處理的坑：`Math.max()` 在完全沒有參數時會回傳 `-Infinity`（因為 `todos` 是空的，`todos.map(...)` 展開後就沒東西了），那第一筆的 id 就會變成 `-Infinity + 1`，還是 `-Infinity`。所以要先判斷「陣列是不是空的」，空的話直接從 1 開始：
+
+```typescript
+// commands.ts
+export function addTodo(todos: Todo[], title: string): Todo[] {
+  // 沒有任何任務時從 1 開始；否則用「目前最大的 id + 1」
+  // 特別處理空陣列，因為 Math.max() 沒參數會回傳 -Infinity
+  const nextId =
+    todos.length === 0 ? 1 : Math.max(...todos.map((todo) => todo.id)) + 1
+
+  const newTodo: Todo = {
+    id: nextId,
+    title,
+    isDone: false,
+    createdAt: new Date().toISOString(),
+  }
+  return [...todos, newTodo]
+}
+```
+
+**為什麼「用最大值 +1」而不是「用 `todos.length + 1`」？**
+
+因為提示裡要求：刪除任務後 **id 不要重新編號**。想像你有 id 1、2、3，刪掉 2 之後陣列長度變 2，如果用 `length + 1` 算，下一筆會拿到 id 3——但 3 已經存在了，就會撞號！用「現有最大值 +1」則會拿到 4，安全地保留空缺、不會指到錯的任務。這也是為什麼我們要保留空缺、而不是重編號。
+
+**其他檔案不用改**：`markDone`、`deleteTodo` 都是用 `todo.id === id` 比對，`todo.ts` 裡的 `parseInt(args[0])` 也照樣能把 `"1"` 轉成數字 `1`，整條路都通。
+
+**驗收點**（這題需要你自己在終端機實機驗證）：
+
+```bash
+# 先把舊的 todos.json 刪掉，避免混到之前的時間戳記 id
+$ rm -f todos.json
+
+$ npx tsx todo.ts add "買牛奶"     # id = 1
+$ npx tsx todo.ts add "寫作業"     # id = 2
+$ npx tsx todo.ts add "洗衣服"     # id = 3
+$ npx tsx todo.ts delete 2         # 刪掉 id 2
+$ npx tsx todo.ts add "倒垃圾"     # 新的 id 應該是 4，不是 3！
+$ cat todos.json                   # 確認 id 依序是 1、3、4，2 的空缺沒被補上
+$ npx tsx todo.ts done 1           # 現在可以用短短的數字了
+```
+
+重點看兩件事：刪掉 2 之後新增的那筆是不是拿到 **4**（而不是回頭補 3），以及全新的空清單第一筆是不是從 **1** 開始。
+
+</details>

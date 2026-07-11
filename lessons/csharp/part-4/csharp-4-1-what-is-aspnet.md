@@ -87,6 +87,45 @@ app.Run();      // 啟動伺服器，開始接受請求
 2. 對照表裡挑三個概念（路由、中介軟體、處理函式），說出 Express 和 ASP.NET Core 各怎麼稱呼。
 3. 用 `dotnet new webapi -o MyApi` 建一個 Web API 專案，`dotnet run` 跑起來，看它預設的回應。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：用「對照 Express」的角度說明 ASP.NET Core**
+
+ASP.NET Core 是**微軟的 Web 後端框架，用 C# 來建構 Web API 與網站**。它和你在 basic 課程學的 Express 是「同一類東西」——都是幫你把「收到 HTTP 請求 → 處理（可能查資料庫）→ 回傳 HTTP 回應」這條流程包好的框架，讓你不用自己從頭解析 HTTP、寫路由。
+
+差別只在**語言與生態**：Express 跑在 Node.js、用 JavaScript/TypeScript 寫；ASP.NET Core 用 C#。核心概念（路由、中介軟體、請求/回應）兩邊互通，所以學過 Express 再看 ASP.NET Core 會很快上手。ASP.NET Core 額外的特色是更「結構化」——內建依賴注入、用 Controller 組織程式碼、強型別編譯期抓錯、效能是業界頂尖之一，特別適合企業級專案。
+
+**第 2 題：三個概念在兩邊的稱呼**
+
+| 概念 | Express | ASP.NET Core |
+|------|---------|--------------|
+| 路由 | `app.get('/users', ...)` | Controller + 路由屬性（如 `[HttpGet("users")]`）|
+| 中介軟體 | `app.use(...)` | Middleware 管道，用 `app.UseXxx()` 加入 |
+| 處理函式 | route handler（回呼函式）| Controller action（Controller 類別裡的方法）|
+
+一句話總結：Express 偏「一個函式搞定一條路由」，ASP.NET Core 偏「用 Controller 類別把相關的 action 分組」。
+
+**第 3 題：建專案跑起來（動手題）**
+
+做法：
+
+```bash
+dotnet new webapi -o MyApi
+cd MyApi
+dotnet run
+```
+
+驗收點：
+
+- 終端機會印出類似 `Now listening on: https://localhost:7xxx` 的訊息，代表伺服器起來了。
+- 預設 `webapi` 範本附一個 `WeatherForecast` 端點，瀏覽器開 `https://localhost:埠/swagger` 就能看到它並測試（見 [csharp-4-2]）。
+- 若遇到 HTTPS 憑證警告，第一次可執行 `dotnet dev-certs https --trust` 信任本機開發憑證。
+
+> 這一步需要你在自己電腦實機執行、觀察終端機輸出與瀏覽器畫面，請自行驗證跑得起來。
+
+</details>
+
 ## 課外讀物
 
 > 對照 Express 後端 → **basic 課程 Part 4**；對照 Rust 的 Axum → **rust 課程 [rust-9-1]、[rust-9-2]**

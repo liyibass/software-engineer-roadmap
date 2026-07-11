@@ -106,6 +106,60 @@ ForEach(nums, n => Console.WriteLine(n * 10));   // 傳一個 Lambda 進去
 2. 用 `Action<string>` 存一個「印出大寫」的 Lambda（提示：`s.ToUpper()`），呼叫測試。
 3. 寫一個方法 `Transform(List<int> list, Func<int, int> fn)`，回傳「每個元素套用 fn 後的新 List」，傳不同的 Lambda（平方、加一）測試。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題：`Func<int, int, int>` 存「相乘」Lambda**
+
+`Func<int, int, int>` 表示「吃兩個 int、回傳一個 int」（最後一個型別參數是回傳值）。把相乘的 Lambda 存進變數，再像呼叫方法一樣呼叫它：
+
+```csharp
+Func<int, int, int> multiply = (a, b) => a * b;
+Console.WriteLine(multiply(6, 7));      // 42
+```
+
+驗收點：印出 `42`。
+
+**第 2 題：`Action<string>` 存「印出大寫」Lambda**
+
+`Action<string>` 表示「吃一個 string、沒有回傳值」（印出來就結束，不回傳東西）。用 `s.ToUpper()` 轉大寫再印出：
+
+```csharp
+Action<string> printUpper = s => Console.WriteLine(s.ToUpper());
+printUpper("hello");        // HELLO
+printUpper("Amy");          // AMY
+```
+
+驗收點：印出全大寫的字串。注意這裡用 `Action`（不是 `Func`），因為「印出」沒有回傳值。
+
+**第 3 題：`Transform` 方法把 `Func` 當參數傳**
+
+`Transform` 負責「跑迴圈、收集結果」，但「每個元素要怎麼轉換」由呼叫者傳進來的 `fn` 決定——這就是委派的彈性。建一個新 List 存結果（不要改到傳進來的原 list）：
+
+```csharp
+List<int> Transform(List<int> list, Func<int, int> fn)
+{
+    var result = new List<int>();
+    foreach (var item in list)
+    {
+        result.Add(fn(item));       // 對每個元素套用傳進來的 fn
+    }
+    return result;
+}
+
+var nums = new List<int> { 1, 2, 3, 4 };
+
+var squared = Transform(nums, n => n * n);      // 平方
+Console.WriteLine(string.Join(", ", squared));  // 1, 4, 9, 16
+
+var plusOne = Transform(nums, n => n + 1);      // 加一
+Console.WriteLine(string.Join(", ", plusOne));  // 2, 3, 4, 5
+```
+
+驗收點：同一個 `Transform` 方法，傳「平方」Lambda 得到 `1, 4, 9, 16`，傳「加一」Lambda 得到 `2, 3, 4, 5`。這其實就是 LINQ `Select` 的簡化版——把「要做什麼」外包給呼叫者。
+
+</details>
+
 ## 課外讀物
 
 > Lambda = 閉包概念 → **rust 課程 [rust-6-5]**；函式式典範 → **cs 課程 Part 8-3**

@@ -104,17 +104,65 @@ ECS Service 會「維持 Desired tasks 數量」。試試看（呼應 SRE Part 8
 
 把你 infra Part 5 容器化的 app（image push 到 ECR 後），部署到 ECS Fargate，透過 ALB 看到它運作。做完清理。
 
+<details>
+<summary>參考解答</summary>
+
+> 這是動手題，以下是**做法與驗收點**。實機操作會建立會計費的資源（Fargate、ALB），請自行在 AWS 環境完成並確認結果，別忘了最後清理。
+
+**做法**（照本章四步）：
+
+1. **前置**：確認 app image 已 push 到 ECR（aws-7-2），拿到位址如 `<帳號>.dkr.ecr.ap-northeast-1.amazonaws.com/my-app:latest`。
+2. **建 Cluster**：ECS → Create cluster，基礎設施選 **AWS Fargate（serverless）**——不用準備任何 EC2。
+3. **寫 Task Definition**：Launch type 選 **Fargate**，CPU/記憶體選小的（如 0.25 vCPU / 0.5GB 省錢），Container 填 Name、你的 **ECR Image URI**、Port mappings（app 聽的 port，如 3000）；若容器要存取其他 AWS 服務就指定 **Task Role**。
+4. **建 Service**：用剛剛的 Task Definition，Desired tasks 設 2（跨 AZ 高可用），Networking 選你的 VPC + **私有子網路** + 只允許 ALB 連的 Security Group，Load balancing 選 **Application Load Balancer** 並設健康檢查路徑（如 `/health`）。
+
+**驗收點**：
+
+- ECS Service 狀態穩定，2 個 task 都是 RUNNING 且通過 ALB 健康檢查。
+- 打開 **ALB 的網址**，看到你的 app 正常回應——而你**全程沒開過一台 EC2、沒 SSH 進任何機器**。
+
+**清理**（重要，避免持續計費）：刪 ECS Service → 刪 Task Definition（可選）→ 刪 ALB → 刪 cluster。
+
+</details>
+
 ---
 
 ### 練習 2：體驗自我修復
 
 手動停掉一個 task，觀察 ECS 自動補一個新的。這對應你 SRE/infra 學的什麼概念？
 
+<details>
+<summary>參考解答</summary>
+
+> 動手部分需自行實機驗證：在 ECS 手動「停止」一個 task，觀察 ECS 會**自動再啟動一個新的**、維持 Desired tasks 數量（本章設的 2 個）。
+
+**驗收點**：停掉一個 task 後，短時間內 Service 會拉起一個新 task，任務數自動回到 2；ALB 也會把新 task 重新註冊進來，使用者存取幾乎無感。
+
+**對應的概念**：這就是容器平台的「**自我修復（self-healing）**」，背後是「**宣告式 / 期望狀態（desired state）**」的思維——你聲明「我要 2 個健康的在跑」，平台就持續確保「永遠有 2 個」，掛了自己補。這對應：
+
+- **SRE Part 8** 的自我修復 / 高可用（讓服務在部分故障時仍持續提供）。
+- **infra Part 6-3** 的宣告式（你描述「想要的狀態」，讓系統自己去達成，而不是一步步下指令）。
+- 也是 aws-7-5 會講的 K8s「Controller 確保實際狀態 = 期望狀態」的同一個精神。
+
+</details>
+
 ---
 
 ### 練習 3：對比 aws-3-2
 
 回答：這次用 ECS Fargate 部署，和 aws-3-2 手動開 EC2 + SSH + 裝 Nginx，體驗上最大的差別是什麼？（提示：你有沒有碰到任何「機器」？）
+
+<details>
+<summary>參考解答</summary>
+
+**最大的差別：你完全沒碰到任何「機器」。**
+
+- **aws-3-2 的方式**：你要手動開一台 EC2、SSH 進去、自己裝 Nginx、改設定、顧這台機器的狀態——你是在「管一台伺服器」。要多開幾台，就得每台重來一遍（或自己弄 image / 腳本），還要自己顧修補、擴縮、掛了要自己救。
+- **這次 ECS Fargate 的方式**：你只**描述「要跑什麼」**（Task Definition：哪個 image、多少資源、聽哪個 port）和「要幾個、怎麼接流量」（Service + ALB），剩下的「在哪台機器跑、怎麼跑、掛了重啟、流量怎麼接、跨 AZ 高可用」全都是 AWS 處理。你**從頭到尾沒開過一台 EC2、沒 SSH 進任何機器**。
+
+一句話：從「**自己動手管機器（imperative，命令式）**」變成「**只聲明想要的結果，平台幫你達成（declarative，宣告式 + serverless）**」。這正是雲端容器平台 + Fargate 想帶來的心智解放。
+
+</details>
 
 ## 課外讀物
 
