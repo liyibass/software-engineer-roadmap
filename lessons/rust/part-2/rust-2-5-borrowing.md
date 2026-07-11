@@ -104,6 +104,69 @@ fn add_world(text: &String) {
 2. 寫一個函式 `print_twice(s: &String)` 印出某字串兩次，在 `main` 連續呼叫它三次，證明借用不會奪走擁有權。
 3. 試著在一個 `&String` 參數的函式裡修改字串（例如 `push_str`），觀察編譯器拒絕你，並預習：要能改，需要什麼？
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**
+
+用 `&String` 借用參數，函式只是「借來讀長度」，不奪走擁有權，所以回到 `main` 原字串照樣能用。
+
+```rust
+fn main() {
+    let s = String::from("哈囉");
+    let n = length(&s);          // 傳參考，不是 s 本身
+    println!("'{}' 的長度是 {}", s, n);   // ✅ s 還在
+}
+
+fn length(s: &String) -> usize {
+    s.len()
+}
+```
+
+關鍵：`&s` 傳的是參考，`length` 用完後參考消失，但它指向的資料（擁有者 `s`）毫髮無傷，所以 `main` 裡的 `s` 能繼續用。
+
+**第 2 題**
+
+每次呼叫都用 `&name` 借用，從沒發生移動，所以能借第二次、第三次。
+
+```rust
+fn main() {
+    let name = String::from("小美");
+    print_twice(&name);
+    print_twice(&name);
+    print_twice(&name);          // 借第三次也沒問題
+    println!("{} 還在", name);    // ✅ 擁有權從沒離開 main
+}
+
+fn print_twice(s: &String) {
+    println!("{}", s);
+    println!("{}", s);
+}
+```
+
+如果把參數改成 `String`（移動版），第一次呼叫後 `name` 就沒了，第二次呼叫會編譯錯誤——這正好對比出「借用不奪走擁有權」的價值。
+
+**第 3 題**
+
+唯讀借用 `&String` 只能讀不能改，想 `push_str` 會被編譯器擋下：
+
+```rust
+fn main() {
+    let s = String::from("哈囉");
+    add_world(&s);
+}
+
+fn add_world(text: &String) {
+    text.push_str(" world");   // ❌ 編譯錯誤
+}
+```
+
+錯誤訊息大意是 `cannot borrow *text as mutable, as it is behind a & reference`——因為 `&String` 是唯讀借用，Rust 不准你透過它修改資料。
+
+要能改，需要**可變借用 `&mut`**：把 `s` 宣告成 `mut`、傳入時寫 `&mut s`、參數型別寫 `&mut String`，三者到齊才能借來修改。這正是下一章 [rust-2-6] 的主題。
+
+</details>
+
 ## 課外讀物
 
 > 「借用而非複製」這種「用最小代價拿到要的東西」的思路，也是效能設計的精神 → [課外讀物 E-11：效能與快取](../../../課外讀物/E-11-performance/E-11-6-backend-profiling.md)

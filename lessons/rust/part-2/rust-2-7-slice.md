@@ -96,6 +96,60 @@ fn main() {
 2. 用切片語法糖寫出：整個字串的切片、從第 5 個字元到結尾的切片。
 3. 重現本章「`clear()` 被擋下」的例子，讀錯誤訊息，理解「切片正在借用，所以不能同時清空」。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**
+
+`"rust is fun"` 是純英文（ASCII），每個字元剛好佔一個位置，索引很好算：`rust` 是 0..4、`is` 是 5..7、`fun` 是 8..11。切片範圍是「起點到終點（不含終點）」。
+
+```rust
+fn main() {
+    let s = String::from("rust is fun");
+    let word1 = &s[0..4];    // "rust"
+    let word2 = &s[5..7];    // "is"
+    let word3 = &s[8..11];   // "fun"
+    println!("{} / {} / {}", word1, word2, word3);
+}
+```
+
+小提醒：這裡索引能這樣直接數，是因為字串全是 ASCII，每個字母佔 1 個位元組。換成中文字（一個字通常佔 3 個位元組）就不能這樣隨便切，切到字元中間會 panic。
+
+**第 2 題**
+
+用語法糖：`&s[..]` 是整個字串的切片；`&s[5..]` 是「從索引 5 到結尾」。
+
+```rust
+fn main() {
+    let s = String::from("rust is fun");
+    let whole = &s[..];      // 整個 "rust is fun"，等同 &s[0..s.len()]
+    let tail = &s[5..];      // 從索引 5 到結尾："is fun"
+    println!("{}", whole);
+    println!("{}", tail);
+}
+```
+
+`&s[..]` 省略頭尾表示「從頭到尾」；`&s[5..]` 省略終點表示「一路到 `s.len()`」。
+
+**第 3 題**
+
+重現「切片還在借用、卻想清空」的違規情境：
+
+```rust
+fn main() {
+    let mut s = String::from("rust is fun");
+    let word = &s[0..4];      // word 是唯讀切片，借用了 s
+    s.clear();                // ❌ clear() 需要 &mut s，但 word 還在唯讀借用
+    println!("{}", word);     // ← 因為這行還用到 word，借用才持續到這裡
+}
+```
+
+編譯器報 `error[E0502]: cannot borrow s as mutable because it is also borrowed as immutable`。
+
+理解它：`word` 是一個唯讀借用，只要後面還會用到 `word`，這個借用就一直有效；而 `s.clear()` 需要一個可變借用去清空 `s`。「唯讀借用還在」和「想拿可變借用」同時發生，正好違反 [rust-2-6] 的借用規則，所以編譯就過不了。這也正是切片安全的價值——如果是「土法存索引」，`clear()` 之後那對索引就指向不存在的資料釀成 bug，但切片和原資料綁在一起，編譯器會在你想破壞它時先擋下來。
+
+</details>
+
 ## 課外讀物
 
 > 切片背後「指向連續記憶體的一段」，呼應陣列的記憶體佈局 → **dsa 課程 Part 2：陣列**

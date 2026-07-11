@@ -124,6 +124,73 @@ graph LR
 2. 加一條 `/hello` 路由，handler 回傳「Hello, Rust Web!」，測試它。
 3. 把某個 handler 的回傳文字改一改，重新 `cargo run`，確認改動生效。觀察：每次改程式都要重新編譯啟動（之後可查 `cargo watch` 自動重啟）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（跑起最小伺服器、兩種方式確認）**
+
+直接用本章「最小可運行的伺服器」那段程式碼，`cargo run` 起來後：
+
+```bash
+# 方式一：終端機用 curl
+curl http://127.0.0.1:3000
+# 你好，這是我的 Rust 伺服器！
+
+# 方式二：瀏覽器輸入 http://127.0.0.1:3000，畫面會顯示同一段文字
+```
+
+驗收點（需自行實機驗證）：終端機先看到「伺服器跑在 http://127.0.0.1:3000」，接著 `curl` 與瀏覽器都拿到那段中文。`Ctrl + C` 可以停掉伺服器。
+
+**第 2 題（加一條 `/hello` 路由）**
+
+新增一個 handler，並在路由表串上 `.route("/hello", get(hello))`：
+
+```rust
+use axum::{routing::get, Router};
+
+async fn root() -> &'static str {
+    "你好，這是我的 Rust 伺服器！"
+}
+
+async fn hello() -> &'static str {
+    "Hello, Rust Web!"           // 新 handler 回傳的文字
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/hello", get(hello));    // 新增這條路由
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
+    println!("伺服器跑在 http://127.0.0.1:3000");
+    axum::serve(listener, app).await.unwrap();
+}
+```
+
+驗收點：
+
+```bash
+curl http://127.0.0.1:3000/hello
+# Hello, Rust Web!
+```
+
+**第 3 題（改回傳文字、重新編譯）**
+
+例如把 `root` 的回傳改成 `"我改過了！"`，存檔後重新 `cargo run`：
+
+```rust
+async fn root() -> &'static str {
+    "我改過了！"
+}
+```
+
+驗收點（需自行實機驗證）：重新 `curl http://127.0.0.1:3000` 會看到新文字。重點觀察是：**每次改完 Rust 程式，都要停掉舊的、重新 `cargo run` 編譯啟動**，新版才會生效——因為 Rust 是編譯式語言。想省掉這步，可安裝 `cargo watch`（`cargo install cargo-watch`），用 `cargo watch -x run` 讓它偵測檔案變動後自動重編重跑。
+
+</details>
+
 ## 課外讀物
 
 > HTTP 方法（GET/POST…）、請求與回應的完整概念 → [課外讀物 E-3：網路通訊基礎](../../../課外讀物/E-3-network/E-3-3-http-protocol.md)、**basic 課程 Part 4**

@@ -123,6 +123,51 @@ public class ProductService
 2. 思考：如果你的服務跑在「3 台伺服器」後面，用記憶體快取會有什麼問題？為什麼該用 Redis？
 3. 思考題：資料更新後，快取還是舊的——這是什麼問題？你會怎麼處理（提示：更新時清快取）？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：用 `IMemoryCache` 加快取（動手題）**
+
+做法：`Program.cs` 加 `builder.Services.AddMemoryCache();`，然後在服務裡用 `GetOrCreateAsync`——這就是 cache-aside 模式（有快取就用、沒有才查並存起來）：
+
+```csharp
+public async Task<List<Product>> GetPopularAsync()
+{
+    return await _cache.GetOrCreateAsync("popular_products", async entry =>
+    {
+        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);  // TTL
+        return await _repo.GetPopularAsync();   // 只在快取沒有時才真的查資料庫
+    });
+}
+```
+
+驗收點：在 `_repo.GetPopularAsync()` 裡加一行 log（或用中斷點），第一次請求會看到「查資料庫」的 log、第二次（5 分鐘內）不會出現——代表第二次直接命中快取。也可用計時觀察：第一次較慢、第二次明顯變快。
+
+> ⚠️ 動手題，「變快」與「第二次沒查庫」請自行實機驗證（看 log 或計時）。
+
+**練習 2：3 台伺服器用記憶體快取會怎樣？為什麼該用 Redis？**
+
+`IMemoryCache` 存在**每台伺服器自己的記憶體**裡，所以 3 台各存各的、**互相看不到**，會出兩個問題：
+
+1. **快取不一致**：負載平衡器把請求隨機分到不同台。A 台快取了熱門清單、B 台還沒，同一個使用者連兩次可能拿到不同結果；某台的資料更新清了自己的快取，另外兩台還是舊的。
+2. **快取命中率低、重複做白工**：同一份資料被 3 台各查一次、各存一份，等於快取效益打三折，也多佔記憶體。
+
+改用 **Redis（`IDistributedCache`）**：快取存在**獨立的一台 Redis**，3 台 app 伺服器**共用同一份**——命中率高、資料一致，而且 app 重啟快取也還在（存在 Redis 不是 app 記憶體）。代價是多一個服務要維護、存取要走一次網路（但仍遠比查資料庫快）。這正是正式、會水平擴展的環境的標準做法。
+
+**練習 3：更新後快取還是舊的——什麼問題？怎麼處理？**
+
+這是**快取一致性（stale cache / 過時資料）** 問題：資料庫已經改了，但快取裡還是舊值且尚未過期，使用者就讀到過時資料。根因是「資料有兩份副本（資料庫 + 快取），更新只改了其中一份」。
+
+常見處理方式：
+
+- **寫入時使快取失效（cache invalidation）**：在更新/刪除資料的那段程式，`SaveChanges` 成功後順手把對應的快取 key 清掉（`_cache.Remove("popular_products")`）。下次讀取時因為快取沒有，就會重查資料庫拿到新值再存回——最單純可靠，最常用。
+- **寫入時直接更新快取（write-through）**：更新資料庫的同時把新值也寫進快取，讀取一路都命中新值。
+- **靠短 TTL 容忍**：接受「最多過時 N 秒」，設短一點的過期時間讓它自己刷新——適合對即時性要求不高的資料。
+
+實務上「更新資料時一併清掉相關快取」最常見。另外要小心衍生坑：大量 key 若設同一個過期時間、同時失效會造成**快取雪崩**（瞬間全打到資料庫），可在 TTL 加一點隨機值分散。
+
+</details>
+
 ## 課外讀物
 
 > 快取完整深入（各層、策略、坑）→ **快取課程**；用空間換時間 → **dsa 課程 [dsa-1-3]**、**cs 課程 Part 3-4**

@@ -188,6 +188,121 @@ graph LR
 2. 為至少一個 handler 寫單元測試（[rust-7-3]），或寫一個腳本用 `curl` 跑完整的「新增→查詢→更新→刪除」流程。
 3. 用 `cargo build --release` 打包，找到產生的執行檔，直接執行它（記得先設好 `DATABASE_URL`），確認不靠 `cargo` 也能跑。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（補完 `get_one` 與 `update`）**
+
+這兩個 handler 放進 `handlers.rs`，補齊本章「留作練習」的部分。`get_one` 用 `fetch_optional` 處理「查不到」的 404；`update` 用 `UPDATE ... RETURNING` 回傳更新後的資料，找不到就 404：
+
+```rust
+// R：查單一（404 處理）
+pub async fn get_one(State(pool): State<PgPool>, Path(id): Path<i32>)
+    -> Result<Json<Todo>, StatusCode>
+{
+    let result = sqlx::query_as::<_, Todo>(
+        "SELECT id, title, done FROM todos WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&pool).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;   // 資料庫錯 → 500
+
+    match result {
+        Some(todo) => Ok(Json(todo)),           // 找到 → 200
+        None => Err(StatusCode::NOT_FOUND),     // 沒找到 → 404
+    }
+}
+
+// U：更新（PUT）
+pub async fn update(
+    State(pool): State<PgPool>,
+    Path(id): Path<i32>,
+    Json(input): Json<UpdateTodo>,              // 注意：Json 這個吃 body 的提取器要放最後
+) -> Result<Json<Todo>, StatusCode> {
+    let result = sqlx::query_as::<_, Todo>(
+        "UPDATE todos SET title = $1, done = $2 WHERE id = $3 \
+         RETURNING id, title, done")
+        .bind(&input.title)                     // 參數化查詢，防 SQL injection
+        .bind(input.done)
+        .bind(id)
+        .fetch_optional(&pool).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    match result {
+        Some(todo) => Ok(Json(todo)),           // 更新成功 → 200 + 更新後的資料
+        None => Err(StatusCode::NOT_FOUND),     // 沒這筆可更新 → 404
+    }
+}
+```
+
+一個容易踩的雷：在 Axum，**會消耗請求 body 的提取器（像 `Json<T>`）必須是 handler 參數列的最後一個**，`State`、`Path` 這些要放在它前面，否則編譯不過。
+
+**第 2 題（為 handler 寫測試 / curl 跑一輪 CRUD）**
+
+最直接的做法是寫一個 shell 腳本，把整條 CRUD 流程跑一遍（需自行實機執行，伺服器要先跑起來、資料庫要接好）：
+
+```bash
+#!/usr/bin/env bash
+set -e
+BASE=http://localhost:3000
+
+echo "== 新增 =="
+NEW=$(curl -s -X POST $BASE/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"學 Rust"}')
+echo "$NEW"                       # {"id":1,"title":"學 Rust","done":false}
+ID=$(echo "$NEW" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+
+echo "== 查單一 =="
+curl -s $BASE/todos/$ID
+
+echo "== 更新 =="
+curl -s -X PUT $BASE/todos/$ID \
+  -H "Content-Type: application/json" \
+  -d '{"title":"學 Rust（已完成）","done":true}'
+
+echo "== 列出全部 =="
+curl -s $BASE/todos
+
+echo "== 刪除 =="
+curl -s -i -X DELETE $BASE/todos/$ID | head -1   # 期待 204 No Content
+```
+
+驗收點：新增拿到 `201`、查單一/列出拿得到資料、更新後 `done` 變 `true`、刪除回 `204`，再查該 id 應回 `404`。
+
+若要寫 Rust 單元測試（[rust-7-3]），純邏輯（不碰資料庫）的部分最好測；碰資料庫的 handler 通常做成整合測試，對一個測試用資料庫跑。示範一個不依賴資料庫、驗證反序列化的小測試：
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_todo_deserializes_from_json() {
+        let json = r#"{"title":"寫測試"}"#;
+        let parsed: CreateTodo = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.title, "寫測試");
+    }
+}
+```
+
+**第 3 題（打包 release 並直接執行）**
+
+```bash
+cargo build --release
+```
+
+產物在 `target/release/todo_api`（名稱是 `Cargo.toml` 裡的 package name）。直接執行它、不透過 `cargo`：
+
+```bash
+export DATABASE_URL="postgres://user:password@localhost:5432/mydb"
+./target/release/todo_api
+# Todo API 跑在 http://127.0.0.1:3000
+```
+
+驗收點（需自行實機驗證）：這個執行檔**不靠 `cargo` 也能跑**，換句話說它是一個獨立的二進位檔——這正是 Rust 後端部署的優勢：把這一個檔案丟上伺服器就能執行，不用像 Node 那樣搬一整包 `node_modules`。記得執行前 `DATABASE_URL` 要設好，否則 `main` 裡的 `expect` 會提醒你。
+
+</details>
+
 ## 課外讀物
 
 > 🎓 **恭喜你完成 Rust 課程！** 從所有權到 Web 後端，你已經掌握了 Rust 的核心。

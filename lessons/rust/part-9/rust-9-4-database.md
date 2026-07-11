@@ -127,6 +127,63 @@ async fn add_todo(pool: &sqlx::PgPool, title: &str) -> Result<Todo, sqlx::Error>
 2. 寫一個查詢函式 `get_todo_by_id`，用 `.bind(id)` 和 `WHERE id = $1`，回傳單一 `Todo`（提示：用 `fetch_optional` 回傳 `Option`，因為可能找不到）。
 3. 想一想：為什麼「把使用者輸入直接拼進 SQL 字串」很危險？用一句話描述 SQL injection。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（資料流圖）**
+
+用 Mermaid 把整條路徑畫出來：
+
+```mermaid
+graph LR
+    REQ["前端請求<br/>GET /todos"] --> H["handler"]
+    H -->|"query_as + fetch_all"| SQLX["sqlx"]
+    SQLX -->|"送出 SQL"| DB[("PostgreSQL")]
+    DB -->|"回傳資料列 (rows)"| SQLX
+    SQLX -->|"FromRow 轉換"| VEC["Vec&lt;Todo&gt;"]
+    VEC -->|"Json(...) 序列化"| JSON["JSON 回應"]
+    JSON --> RESP["送回前端"]
+```
+
+這張圖在說：請求進 handler → handler 用 sqlx 送 SQL 給 PostgreSQL → 資料庫回傳「資料列」→ sqlx 靠 `FromRow` 把每一列變成 `Todo`、湊成 `Vec<Todo>` → 再用 `Json(...)` 序列化（[rust-9-3]）成 JSON 送回前端。
+
+**第 2 題（`get_todo_by_id` 用 `fetch_optional`）**
+
+因為指定 id 可能查不到，回傳型別用 `Option<Todo>`，並用 `fetch_optional`（查得到給 `Some`、查不到給 `None`）：
+
+```rust
+async fn get_todo_by_id(
+    pool: &sqlx::PgPool,
+    id: i32,
+) -> Result<Option<Todo>, sqlx::Error> {
+    let todo = sqlx::query_as::<_, Todo>(
+        "SELECT id, title, done FROM todos WHERE id = $1"
+    )
+    .bind(id)                    // 把 id 安全綁到 $1（參數化查詢）
+    .fetch_optional(pool)        // 回傳 Option：Some(找到) / None(查無)
+    .await?;                     // 資料庫層級的錯誤（連線斷等）用 ? 往上傳
+    Ok(todo)
+}
+```
+
+驗收點：
+
+- 傳一個存在的 id → 拿到 `Ok(Some(todo))`。
+- 傳一個不存在的 id → 拿到 `Ok(None)`（注意：**查無資料不是錯誤**，所以是 `Ok(None)` 而不是 `Err`）。
+- 只有連線斷、SQL 壞掉這種真正的失敗才會是 `Err`，被 `?` 往上拋。
+
+到了下一節（[rust-9-5]），你會把這個 `None` 對應成 HTTP `404`、把 `Err` 對應成 `500`。
+
+**第 3 題（為什麼直接拼字串危險 + 一句話描述 SQL injection）**
+
+危險的原因：如果把使用者輸入直接用字串拼進 SQL，使用者輸入的內容就會被資料庫**當成 SQL 指令的一部分去執行**，而不只是「一筆資料」。例如查詢寫成 `"SELECT * FROM users WHERE name = '" + input + "'"`，攻擊者在 `input` 塞入 `' OR '1'='1`，整條 SQL 的語意就被改寫成「條件永遠成立」，於是撈出整張表；更狠的還能塞入 `; DROP TABLE users; --` 直接刪表。
+
+一句話描述 **SQL injection**：*攻擊者在輸入裡塞進 SQL 語法，讓自己的輸入被資料庫當成指令執行，藉此竊取、竄改或破壞資料。*
+
+防法就是本章的**參數化查詢**——用 `$1` 佔位、`.bind(value)` 綁值，資料庫會把綁進來的值**永遠只當純資料**、絕不解讀成 SQL，從根本上堵死這個漏洞。
+
+</details>
+
 ## 課外讀物
 
 > SQL injection 與參數化查詢 → [課外讀物 E-10-4：SQL Injection](../../../課外讀物/E-10-security/E-10-4-sql-injection.md)

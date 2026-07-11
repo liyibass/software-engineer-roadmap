@@ -119,6 +119,58 @@ struct Thing { /* ... */ }
 2. 給一個 `Settings` struct（幾個數字/布林欄位）derive `Default`，用 `Settings::default()` 建立並印出。
 3. 思考題：為什麼 `String` 不能 derive `Copy`，但可以 derive `Clone`？（提示：回憶 [rust-2-4] 堆疊 vs 堆積、廉價複製 vs 深拷貝。）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：一行 `#[derive(Debug, Clone, PartialEq)]` 就同時得到印出、複製、比較三種能力。
+
+```rust
+#[derive(Debug, Clone, PartialEq)]
+struct Book {
+    title: String,
+    pages: u32,
+}
+
+fn main() {
+    let b1 = Book { title: String::from("Rust 入門"), pages: 300 };
+
+    let b2 = b1.clone();                // 複製一份獨立的
+    println!("{:?}", b1);              // 印出（靠 Debug）
+
+    let b3 = Book { title: String::from("Rust 入門"), pages: 300 };
+    println!("{}", b1 == b3);          // true：每個欄位都相等
+    println!("{}", b1 == Book { title: String::from("別本"), pages: 100 }); // false
+}
+```
+
+（`Book` 欄位以你在 [rust-3-1] 定義的為準，這裡示範用 `title` 與 `pages`。注意 `String` 本身有實作 `Debug`/`Clone`/`PartialEq`，`Book` 才能順利 derive——derive 的前提是「每個欄位的型別也都有實作那個 trait」。）
+
+**第 2 題**：derive `Default` 後，每個欄位都用它自己型別的預設值（數字 `0`、布林 `false`）。
+
+```rust
+#[derive(Debug, Default)]
+struct Settings {
+    max_retries: u32,
+    timeout_secs: u32,
+    verbose: bool,
+}
+
+fn main() {
+    let s = Settings::default();
+    println!("{:?}", s);   // Settings { max_retries: 0, timeout_secs: 0, verbose: false }
+}
+```
+
+**第 3 題（思考題）**：關鍵在 `Copy` 和 `Clone` 代表的複製「代價」不同。
+
+- `Copy` 的意思是「這個型別可以靠**單純逐位元組拷貝堆疊上的資料**就完整複製」——快到編譯器願意在賦值時「自動、隱含地」幫你複製，不會發生所有權移動。這只適用於「資料整包都在堆疊上」的小型別，例如 `i32`、`bool`、`char`。
+- 但 `String` 的內容（實際的文字位元組）是放在**堆積**上的，`String` 本身在堆疊上只是一個「指標 + 長度 + 容量」。如果讓它 `Copy`，逐位元組拷貝只會複製那個指標，變成兩個 `String` 指向同一塊堆積記憶體——這正是所有權系統要避免的「二次釋放（double free）」危險。所以 `String` **不能** derive `Copy`。
+- `Clone` 則是「**明確地、要你親手呼叫 `.clone()`**」的複製，而且允許做「更花力氣」的深拷貝——`String::clone()` 會另外去堆積上配置一塊新記憶體、把文字整份複製過去，得到兩個各自獨立、互不干擾的 `String`。因為代價高，Rust 逼你手動寫出 `.clone()`，讓「這裡有一次昂貴複製」在程式碼裡看得見。
+
+一句話總結：`Copy` = 廉價、隱含、只限堆疊資料；`Clone` = 可以昂貴、必須明講。`String` 帶著堆積資料，只符合後者。
+
+</details>
+
 ## 課外讀物
 
 > `#[derive]` 自動產生樣板，呼應「不要重複自己（DRY）」 → [課外讀物 E-6-1：什麼是 Clean Code](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)

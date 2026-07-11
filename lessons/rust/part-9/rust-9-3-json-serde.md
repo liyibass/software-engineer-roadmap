@@ -148,6 +148,94 @@ graph LR
 2. 加一條 `/users/:id` 路由，用 `Path<u32>` 取出 id，回傳「使用者 #id」。
 3. 寫一個 `POST /users` 的 handler，用 `Json<CreateUser>`（含 `name`、`email`）接收資料，回傳「已建立使用者 name」。
 
+<details>
+<summary>參考解答</summary>
+
+三題可以合在同一個檔案裡完成。以下是完整可編譯的版本，把三條路由都串起來：
+
+```rust
+use axum::{
+    extract::Path,
+    routing::{get, post},
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
+
+// 第 1 題：能被序列化成 JSON 的 User
+#[derive(Serialize)]
+struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+// 第 1 題：回傳 Json<User>
+async fn get_user() -> Json<User> {
+    let user = User {
+        id: 1,
+        name: String::from("Alice"),
+        email: String::from("alice@example.com"),
+    };
+    Json(user)     // Axum 自動序列化成 JSON 回應
+}
+
+// 第 2 題：從路徑取出 id
+async fn get_one_user(Path(id): Path<u32>) -> String {
+    format!("使用者 #{}", id)
+}
+
+// 第 3 題：能從 JSON 反序列化的 CreateUser
+#[derive(Deserialize)]
+struct CreateUser {
+    name: String,
+    email: String,
+}
+
+// 第 3 題：用 Json 提取器接收 body
+async fn create_user(Json(payload): Json<CreateUser>) -> String {
+    // email 也拿到了（這裡示範只用 name），實務上會拿去存資料庫
+    format!("已建立使用者 {}（email：{}）", payload.name, payload.email)
+}
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/user", get(get_user))
+        .route("/users/:id", get(get_one_user))   // :id 是路徑參數
+        .route("/users", post(create_user));      // POST
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+```
+
+驗收點（需自行實機執行 `cargo run` 後用 `curl` 測）：
+
+```bash
+# 第 1 題
+curl http://127.0.0.1:3000/user
+# {"id":1,"name":"Alice","email":"alice@example.com"}
+
+# 第 2 題
+curl http://127.0.0.1:3000/users/7
+# 使用者 #7
+
+# 第 3 題
+curl -X POST http://127.0.0.1:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Bob","email":"bob@example.com"}'
+# 已建立使用者 Bob（email：bob@example.com）
+```
+
+小提醒：
+
+- `#[derive(Serialize)]` 只給「要送出去」的 struct（`User`），`#[derive(Deserialize)]` 給「要收進來」的 struct（`CreateUser`）——方向相反，別加錯。
+- 第 3 題若送的 JSON 缺 `name` 或 `email`、或格式壞掉，Axum 的 `Json` 提取器會自動回一個錯誤回應，你的 handler 根本不會被呼叫到，不用自己驗證格式。
+
+</details>
+
 ## 課外讀物
 
 > JSON、HTTP body、Content-Type 的完整概念 → [課外讀物 E-3：網路通訊基礎](../../../課外讀物/E-3-network/E-3-3-http-protocol.md)、**basic 課程 Part 4**

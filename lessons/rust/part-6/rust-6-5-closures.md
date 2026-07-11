@@ -110,6 +110,54 @@ fn main() {
 2. 寫一個閉包，捕捉外部變數 `tax_rate = 0.05`，接收一個價格、回傳「含稅價」。改變 `tax_rate` 前先定義閉包，體會「捕捉」。
 3. 用迭代器 + 閉包：給一個名字向量 `vec!["Amy", "Bob", "Cathy"]`，篩出「長度大於 3」的名字收集成新向量（提示：閉包裡用 `name.len() > 3`）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：把閉包存進變數，再像函式一樣呼叫。
+
+```rust
+fn main() {
+    let square = |x: i32| x * x;
+    println!("{}", square(6));   // 36
+}
+```
+
+**第 2 題**：閉包定義時就「捕捉」了周圍的 `tax_rate`，之後每次呼叫都記得它。
+
+```rust
+fn main() {
+    let tax_rate = 0.05;                          // 環境變數
+
+    // 閉包捕捉了 tax_rate，接收價格、回傳含稅價
+    let with_tax = |price: f64| price * (1.0 + tax_rate);
+
+    println!("{}", with_tax(100.0));  // 105
+    println!("{}", with_tax(200.0));  // 210
+}
+```
+
+重點體會：`with_tax` 的參數只有 `price`，但它算式裡用到的 `tax_rate` 不是參數——閉包從周圍環境把它「打包」進來了。這正是閉包和一般 `fn` 最大的差別：`fn` 只能用自己的參數，做不到這種「記住外面變數」的事。
+
+**第 3 題**：`filter` 的閉包判斷長度，`name.len() > 3` 直接比。`&str` 是可 `Copy` 的參考，可以用 `.copied()` 把 `&&str` 攤平成 `&str` 收集起來。
+
+```rust
+fn main() {
+    let names = vec!["Amy", "Bob", "Cathy"];
+
+    let long_names: Vec<&str> = names
+        .iter()
+        .filter(|name| name.len() > 3)   // 只留長度 > 3 的
+        .copied()                        // &&str → &str
+        .collect();
+
+    println!("{:?}", long_names);        // ["Cathy"]
+}
+```
+
+只有 "Cathy"（5 個字）通過，"Amy"、"Bob" 都是 3 個字、不算「大於 3」。`filter` 裡的閉包參數 `name` 是 `&&str`，但 `.len()` 會自動解參考，所以 `name.len() > 3` 照寫就好。
+
+</details>
+
 ## 課外讀物
 
 > 閉包是函式式程式設計的核心概念之一 → **cs 課程 Part 8：程式設計典範（函式式）**

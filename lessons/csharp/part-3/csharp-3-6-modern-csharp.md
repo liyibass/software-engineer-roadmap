@@ -98,6 +98,72 @@ pattern matching → 更優雅（依樣貌分支）
 2. 寫一段處理 `string?`（可能 null）的程式，用 `?.` 和 `??` 安全地取得它的長度或預設值。
 3. 用 switch 表達式 + 模式比對，寫一個函式依輸入（int / string / null）回傳不同描述。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：`record`、`==`、`with`**
+
+`record` 一行就有了「以值比較相等」和 `with` 複製修改，這題正好把兩個特性都用上：
+
+```csharp
+record Product(string Name, decimal Price);
+
+var a = new Product("咖啡", 120m);        // decimal 字面值加 m
+var b = new Product("咖啡", 120m);        // 內容和 a 完全一樣
+
+Console.WriteLine(a == b);                // True！record 比的是「內容」不是「參考」
+
+// with：複製一份、只改 Price，原本的 a 不受影響（record 預設不可變）
+var discounted = a with { Price = 99m };
+Console.WriteLine(discounted);            // Product { Name = 咖啡, Price = 99 }
+Console.WriteLine(a);                     // Product { Name = 咖啡, Price = 120 }（沒被改到）
+```
+
+重點推導：一般 `class` 的 `==` 比的是「兩個變數是不是指向同一個物件」（參考相等），所以 `a == b` 會是 `false`；`record` 幫你改成「內容相同就相等」，這正是資料型別想要的行為。`with` 不是「就地修改」，而是「複製後改指定欄位」，所以原本的 `a` 一定不會被動到。
+
+**練習 2：用 `?.` 和 `??` 安全處理 `string?`**
+
+`Console.ReadLine()` 的回傳型別本來就是 `string?`（使用者可能沒輸入 / 串流結束時是 null），拿它當例子最自然：
+
+```csharp
+string? input = Console.ReadLine();
+
+// ?. 如果 input 是 null，整條就短路成 null，不會丟 NullReferenceException
+int? length = input?.Length;
+
+// ?? 「左邊是 null 就用右邊」，把可能 null 的值收斂成一定有值
+string safe = input ?? "（沒有輸入）";
+int lengthOrZero = input?.Length ?? 0;    // 先 ?. 再 ?? 給預設值，很常見的組合
+
+Console.WriteLine($"長度：{lengthOrZero}，內容：{safe}");
+```
+
+重點：`?.` 負責「存取時遇到 null 就安全短路」，`??` 負責「把 null 換成預設值」，兩個常常一起用（`input?.Length ?? 0`）。這樣編譯器就不會再警告你「可能存取到 null」。
+
+**練習 3：switch 表達式 + 模式比對**
+
+依「型別」和「null」分支，正是模式比對最擅長的：
+
+```csharp
+string Describe(object? value) => value switch
+{
+    int n when n > 0 => $"正整數 {n}",   // 型別比對 + when 條件
+    int n            => $"非正整數 {n}",
+    string s         => $"字串「{s}」",
+    null             => "空值",
+    _                => "其他型別"        // 一定要有 _ 兜底，否則可能漏掉分支
+};
+
+Console.WriteLine(Describe(5));      // 正整數 5
+Console.WriteLine(Describe(-1));     // 非正整數 -1
+Console.WriteLine(Describe("hi"));   // 字串「hi」
+Console.WriteLine(Describe(null));   // 空值
+```
+
+注意參數寫成 `object?` 才能接受 `null`；分支順序有意義（`int n when n > 0` 要放在無條件的 `int n` 前面，否則永遠比不到），最後用 `_` 兜底避免遺漏。
+
+</details>
+
 ## 課外讀物
 
 > 對抗 null（Option 概念）、不可變、模式比對 → **rust 課程 [rust-3-4] Option、[rust-1-1] 不可變、[rust-3-5] match**

@@ -165,6 +165,63 @@ dotnet run
 2. 加一個 `GET /api/todos?done=true` 端點，用 EF Core 的 `Where` 在資料庫層篩選（而非撈出全部再篩）。
 3. 思考題：對比 [csharp-5-6] 記憶體版，這版主要改了哪些地方？為什麼資料現在重啟不會消失？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：完整接上資料庫並驗證持久化（動手題）**
+
+做法（照本章四步走）：
+
+1. 實體 `TodoItem`（其實 csharp-5-6 那版幾乎不用改）。
+2. 建 `AppDbContext`（含 `DbSet<TodoItem> Todos`），在 `Program.cs` 用 `AddDbContext` + `UseNpgsql` 註冊，連線字串放 `appsettings.json` 的 `ConnectionStrings:DefaultConnection`。
+3. `dotnet ef migrations add InitialCreate` → `dotnet ef database update` 建表。
+4. Controller 注入 `AppDbContext`，把 `static List` 操作換成 `_db.Todos` 的 EF Core 查詢，全部方法改 `async`。
+
+驗收點：
+
+- `POST` 一筆待辦 → `GET` 看得到。
+- **Ctrl+C 停掉程式 → 再 `dotnet run` → `GET` 那筆待辦還在**（這就是持久化成功的證明）。
+- 直接用資料庫工具（psql / DBeaver）查 `Todos` 資料表，能看到那一列 → 確認資料真的寫進資料庫而非記憶體。
+
+> ⚠️ 動手題，需自行實機驗證。若 `dotnet ef` 指令找不到，先 `dotnet tool install --global dotnet-ef`；若連不上資料庫，先確認 PostgreSQL 有跑、連線字串正確。
+
+**練習 2：在資料庫層篩選 `GET /api/todos?done=true`**
+
+關鍵是把 `Where` 放進 `IQueryable` 查詢鏈裡，讓它**翻譯成 SQL 的 `WHERE` 由資料庫執行**，而不是先 `ToListAsync()` 撈出全部再用記憶體篩：
+
+```csharp
+[HttpGet]
+public async Task<IActionResult> GetAll([FromQuery] bool? done)
+{
+    var query = _db.Todos.AsQueryable();          // 還沒送查詢
+    if (done.HasValue)
+        query = query.Where(t => t.IsDone == done.Value);  // 這段會變成 SQL WHERE
+
+    var todos = await query
+        .OrderBy(t => t.Id)
+        .Select(t => new TodoDto(t.Id, t.Title, t.IsDone))
+        .ToListAsync();                           // 到這裡才真的打資料庫
+    return Ok(todos);
+}
+```
+
+為什麼要在資料庫層篩？假設有 100 萬筆但只有 3 筆已完成，「資料庫層篩」只回傳 3 筆；「撈全部再篩」會把 100 萬筆全搬進 app 記憶體再丟掉 99.9997%——又慢又耗記憶體。驗收：`?done=true` 只回已完成，且看 EF Core 生成的 SQL 應包含 `WHERE`。
+
+**練習 3：對比記憶體版改了哪些地方？為什麼重啟不消失？**
+
+主要改動：
+
+1. **儲存媒介**：`static List<TodoItem>` → 注入的 `AppDbContext`（`_db.Todos`）。
+2. **建立資料的方式**：`_todos.Add(...)` + 手動 `_nextId++` → `_db.Todos.Add(...)` + `SaveChangesAsync()`，Id 由資料庫自動產生。
+3. **查詢**：`_todos.FirstOrDefault(...)` → `_db.Todos.FindAsync(...)` / LINQ + `ToListAsync()`。
+4. **更新**：改完屬性後靠 EF Core 的**變更追蹤** + `SaveChangesAsync()` 自動發 `UPDATE`（不用手動找出來改）。
+5. **全面 async**：資料庫是 I/O 操作，所有方法變 `async Task<IActionResult>`。
+6. 多了前置設定：`DbContext`、`Program.cs` 註冊、Migration 建表。
+
+為什麼重啟不消失：`static List` 存在**行程的記憶體（RAM，揮發性）**，程式一結束就被回收；換成 EF Core 後，`SaveChangesAsync()` 把資料真正寫進**資料庫（硬碟上的持久化儲存，非揮發性）**。程式重啟只是重新連上同一個資料庫，資料本來就一直躺在那裡，所以查得回來。
+
+</details>
+
 ## 課外讀物
 
 > 整合的觀念 → 複習 Part 6 全部；對照 Rust 接資料庫 → **rust 課程 [rust-9-4]、[rust-9-6]**

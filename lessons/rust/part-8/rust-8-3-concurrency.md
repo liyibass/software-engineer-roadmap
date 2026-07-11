@@ -99,6 +99,68 @@ fn main() {
 2. 用 `move` 把一個 `String` 移進一個執行緒裡印出來，確認移進去後主執行緒不能再用它。
 3. 思考題：用自己的話解釋「為什麼 [rust-2-6] 學的借用規則，剛好就能防止多執行緒的資料競爭？」
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（三個執行緒各印編號）**
+
+用一個迴圈開三個執行緒，把編號 `move` 進去，再逐一 `join`：
+
+```rust
+use std::thread;
+
+fn main() {
+    let mut handles = vec![];
+
+    for id in 1..=3 {
+        // move 把 id 的擁有權搬進閉包，每個執行緒有自己的一份
+        let handle = thread::spawn(move || {
+            println!("執行緒 {}", id);
+        });
+        handles.push(handle);
+    }
+
+    // 等三個執行緒都跑完，主執行緒才結束
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+```
+
+驗收點（需自行實機執行 `cargo run` 觀察）：多跑幾次，會發現印出來的順序**每次可能不同**（有時 1、2、3，有時 2、1、3……）。因為三個執行緒是同時在跑，誰先搶到 CPU 印出來不保證——這就是並行「不決定順序」的直覺。
+
+**第 2 題（把 String move 進執行緒）**
+
+```rust
+use std::thread;
+
+fn main() {
+    let message = String::from("我被移進執行緒了");
+
+    let handle = thread::spawn(move || {
+        println!("子執行緒：{}", message);   // 執行緒擁有 message
+    });
+
+    // println!("{}", message);  // ❌ 取消註解就編譯失敗：value borrowed here after move
+    handle.join().unwrap();
+}
+```
+
+驗收點：把那行註解打開，編譯器會報 `borrow of moved value: message`。因為 `move` 把 `String` 的**擁有權**搬進了閉包（`String` 不是 `Copy`，[rust-2-3]），主執行緒手上已經沒有它了，自然不能再用。這正是所有權在保護你——避免主執行緒和子執行緒同時碰同一份資料。
+
+**第 3 題（借用規則為什麼能擋資料競爭）**
+
+資料競爭的定義是：**多個執行緒同時存取同一份資料，而且至少一個在寫**。而 [rust-2-6] 的借用規則說：**同一時間，要嘛有多個唯讀借用（`&T`）、要嘛只有一個可變借用（`&mut T`），兩者不能並存**。
+
+把這兩句擺在一起就看出來了——借用規則允許的兩種情況，剛好都不會構成資料競爭：
+
+- 多個 `&T`（大家都只讀）→ 沒有人在寫 → 不可能有競爭。
+- 只有一個 `&mut T`（只有一個人能寫）→ 不可能有「另一個人同時也在讀/寫」。
+
+Rust 只是把這套原本用在單執行緒的規則，**延伸套用到執行緒之間**（靠 `Send`/`Sync` 這兩個 trait 標記哪些型別能安全跨執行緒）。於是「一個在寫、另一個同時在讀」這種危險組合，在編譯期就被借用檢查擋下來了。這就是「無懼並行」：能編譯過，就沒有資料競爭。
+
+</details>
+
 ## 課外讀物
 
 > 行程、執行緒、CPU 排程、競爭條件、死結的完整背景 → **cs 課程 Part 5：作業系統（並行的麻煩）**

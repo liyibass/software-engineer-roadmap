@@ -125,6 +125,86 @@ graph TB
 2. 為 [rust-4-1] 的 `safe_divide`（回傳 `Result`）寫測試：驗證 `safe_divide(10, 2)` 是 `Ok(5)`、`safe_divide(1, 0)` 是 `Err(...)`。
 3. 故意把 `add` 改錯（例如改成 `a - b`），跑 `cargo test`，看測試「抓到你改壞了」——體會測試當安全網的價值。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：把要測的函式和 `#[cfg(test)]` 測試模組放同一個檔案，`use super::*;` 把外層的 `square` 引進來。
+
+```rust
+fn square(n: i32) -> i32 {
+    n * n
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_square() {
+        assert_eq!(square(4), 16);
+        assert_eq!(square(0), 0);
+        assert_eq!(square(-3), 9);   // 負數平方也是正的
+    }
+}
+```
+
+跑 `cargo test`，會看到 `test tests::test_square ... ok`。
+
+**第 2 題**：`safe_divide` 回傳 `Result`，所以用 `assert_eq!` 直接和 `Ok(...)` 比；錯誤那條可以用 `.is_err()` 確認是 `Err`。
+
+```rust
+fn safe_divide(a: i32, b: i32) -> Result<i32, String> {
+    if b == 0 {
+        return Err(String::from("除數不能為零"));
+    }
+    Ok(a / b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_safe_divide_ok() {
+        assert_eq!(safe_divide(10, 2), Ok(5));
+    }
+
+    #[test]
+    fn test_safe_divide_by_zero() {
+        // 除以 0 應該回傳 Err
+        assert!(safe_divide(1, 0).is_err());
+
+        // 若想更嚴格，也可以連錯誤訊息一起比
+        assert_eq!(safe_divide(1, 0), Err(String::from("除數不能為零")));
+    }
+}
+```
+
+小提醒：要能用 `assert_eq!` 比較 `Result`，它的 `Ok`/`Err` 內含型別（這裡 `i32` 和 `String`）本來就有實作 `PartialEq` 和 `Debug`，所以直接比沒問題。
+
+**第 3 題**：這題是「動手體會」。把原本正確的 `add` 改壞：
+
+```rust
+fn add(a: i32, b: i32) -> i32 {
+    a - b        // 故意改錯：本來是 a + b
+}
+```
+
+再跑 `cargo test`，原本的 `test_add` 會失敗，輸出類似：
+
+```
+test tests::test_add ... FAILED
+
+---- tests::test_add stdout ----
+assertion `left == right` failed
+  left: -1
+ right: 5
+```
+
+`assert_eq!` 貼心地印出「實際算出 -1、預期 5」，一眼就知道哪裡不對。這就是測試當安全網的價值：你改壞了程式，不用手動一個個試，一個 `cargo test` 就立刻抓到。改回 `a + b`，測試又變綠燈。
+
+</details>
+
 ## 課外讀物
 
 > 為什麼要測試、測試金字塔、單元/整合/端對端 → [課外讀物 E-9：測試](../../../課外讀物/E-9-testing/E-9-1-why-test.md)

@@ -117,6 +117,60 @@ fn main() {
 2. 用 `.iter().sum()` 和 `.iter().max()` 算一個數字向量的總和與最大值。
 3. 用 `.filter().count()` 算一句話裡「長度大於 3 的詞」有幾個（提示：`text.split_whitespace()` 配 `word.len()`）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：`filter` 篩、`map` 轉、`collect` 收，一條鏈串起來就是整個需求。
+
+```rust
+fn main() {
+    let nums = vec![1, 2, 3, 4, 5, 6, 7, 8];
+
+    let result: Vec<i32> = nums
+        .iter()
+        .filter(|n| **n > 3)     // 只留大於 3 的（**n 解兩層參考再比較）
+        .map(|n| n + 100)        // 各加 100
+        .collect();
+
+    println!("{:?}", result);    // [104, 105, 106, 107, 108]
+}
+```
+
+小提醒：`filter` 的閉包參數 `n` 是 `&&i32`（`iter()` 給 `&i32`，`filter` 又再借一層），所以要 `**n` 解兩層才能和 `3` 比。到了 `map`，參數 `n` 是 `&i32`，`n + 100` 會自動解參考，寫起來反而乾淨。
+
+**第 2 題**：`sum()` 和 `max()` 都是「消費者」，會真正驅動迭代器跑完。`max()` 回傳 `Option`（空向量沒有最大值，所以包在 `Some`/`None` 裡）。
+
+```rust
+fn main() {
+    let nums = vec![3, 1, 4, 1, 5, 9, 2, 6];
+
+    let total: i32 = nums.iter().sum();
+    let biggest = nums.iter().max();      // 回傳 Option<&i32>
+
+    println!("總和 = {}", total);         // 總和 = 31
+    println!("最大 = {:?}", biggest);     // 最大 = Some(9)
+}
+```
+
+**第 3 題**：`split_whitespace()` 本身就回傳一個「逐個吐出詞」的迭代器，直接接 `filter` 再 `count` 即可。
+
+```rust
+fn main() {
+    let text = "the quick brown fox is fun";
+
+    let count = text
+        .split_whitespace()             // 逐詞：the, quick, brown, fox, is, fun
+        .filter(|word| word.len() > 3)  // 只留長度 > 3 的：quick, brown
+        .count();
+
+    println!("長度大於 3 的詞有 {} 個", count);  // 2
+}
+```
+
+這裡 `word` 是 `&str`，`word.len() > 3` 直接比就好，不用解參考。`count()` 是消費者，會把整條鏈跑完並回傳通過篩選的個數。
+
+</details>
+
 ## 課外讀物
 
 > 迭代器是「函式式程式設計」風格的體現 → **cs 課程 Part 8：程式設計典範（函式式）**

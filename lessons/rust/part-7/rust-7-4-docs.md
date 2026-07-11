@@ -98,6 +98,81 @@ pub fn add(a: i32, b: i32) -> i32 { a + b }
 2. 在範例裡故意寫一個**錯的** `assert_eq!`（例如說 `add(2,3)` 等於 `6`），跑 `cargo test`，看 doc test 抓出這個錯誤。
 3. 在 `src/main.rs` 或 `lib.rs` 最上方用 `//!` 寫一段「這個專案是做什麼的」說明，重新產生文件看看。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：文件註解用 `///` 寫在函式正上方，`# 範例` 區段裡放一段用 ` ``` ` 包起來的範例程式碼。
+
+```rust
+/// 計算兩個整數的和。
+///
+/// # 範例
+///
+/// ```
+/// use my_crate::add;
+///
+/// let result = add(2, 3);
+/// assert_eq!(result, 5);
+/// ```
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+跑 `cargo doc --open`，瀏覽器會打開一份排版精美的網頁文件，`add` 的說明和範例都在上面。（範例裡的 `use my_crate::add;` 中的 `my_crate` 要換成你自己 crate 的名字；若這段是寫在 binary crate 的 `main.rs` 而非 `lib.rs`，doc test 會抓不到路徑，通常文件測試會放在 library crate 裡。）
+
+**第 2 題**：把範例裡的 `assert_eq!` 故意寫錯，doc test 就會失敗。
+
+```rust
+/// 計算兩個整數的和。
+///
+/// # 範例
+///
+/// ```
+/// use my_crate::add;
+///
+/// // 故意寫錯：add(2, 3) 其實是 5，不是 6
+/// assert_eq!(add(2, 3), 6);
+/// ```
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+跑 `cargo test`，除了一般測試，Rust 還會把這段 `///` 裡的範例編譯並執行，於是報出類似：
+
+```
+   Doc-tests my_crate
+
+running 1 test
+test src/lib.rs - add (line 6) ... FAILED
+
+---- src/lib.rs - add (line 6) stdout ----
+assertion `left == right` failed
+  left: 5
+ right: 6
+```
+
+這正是文件測試的價值：它逼你的文件範例「必須真的能跑、結果要對」，範例一過時就會被抓出來，文件永遠可信。把 `6` 改回 `5` 就通過了。
+
+**第 3 題**：`//!`（有驚嘆號）寫在檔案最上方，描述「包含它的那個東西」——整個 crate／模組。
+
+```rust
+//! # 我的數學工具庫
+//!
+//! 這個 crate 提供基本的數學運算函式，
+//! 目前包含加法 `add`，之後會慢慢擴充。
+
+/// 計算兩個整數的和。
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+重新跑 `cargo doc --open`，文件首頁最上方就會出現這段「crate 總覽」說明。差別記法：`//!` 描述「我所在的這一包」（放檔案／模組頂端），`///` 描述「我下面那一個項目」。兩者搭配，就有總覽也有細節。
+
+</details>
+
 ## 課外讀物
 
 > 註解寫「為什麼」、避免無意義的註解、讓程式碼自我說明 → [課外讀物 E-6-5：註解的藝術](../../../課外讀物/E-6-best-practices/E-6-5-comments.md)

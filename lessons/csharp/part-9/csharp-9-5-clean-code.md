@@ -122,6 +122,91 @@ Clean Code 是「讓程式更好維護」的手段，不是目的本身。
 2. 把一個冗長的 if-else 或迴圈，用「表達式主體 / switch 表達式 / LINQ」改寫得更簡潔（但確保更好讀）。
 3. 跑 `dotnet format` 格式化你的專案，觀察它統一了哪些東西。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：找出不符 C# 命名慣例的地方並修正**
+
+檢查重點（C# 慣例）：**方法、屬性、類別、介面用 PascalCase**；區域變數、參數用 camelCase；private 欄位用 `_camelCase`；介面加 `I` 開頭。來自 JS/TS 的人最常把「方法、屬性」寫成 camelCase——這是這題要抓的。
+
+```csharp
+// ❌ 不符 C# 慣例（像 JS/TS 的寫法）
+public class todoService                       // 類別應 PascalCase
+{
+    private ITodoRepository repo;              // private 欄位應 _camelCase
+    public async Task<List<TodoDto>> getAll()  // 方法應 PascalCase
+    {
+        var TodoList = await repo.GetAllAsync(); // 區域變數應 camelCase
+        return TodoList.Select(toDto).ToList();
+    }
+}
+
+// ✅ 符合 C# 慣例
+public class TodoService
+{
+    private readonly ITodoRepository _repo;    // _camelCase + readonly
+    public async Task<List<TodoDto>> GetAllAsync()  // PascalCase，async 方法慣例加 Async 後綴
+    {
+        var todoList = await _repo.GetAllAsync();
+        return todoList.Select(ToDto).ToList();
+    }
+}
+```
+
+驗收：類別/方法/屬性 = PascalCase、區域變數/參數 = camelCase、private 欄位 = `_` 開頭、介面 = `I` 開頭、async 方法習慣加 `Async` 後綴。開啟編輯器的 .NET 命名分析器（或 IDE 提示）也會幫你標出這些。
+
+**練習 2：把冗長 if-else / 迴圈改簡潔**
+
+改寫的目標是「更好讀」，不是「更短就好」。幾種常見改法：
+
+```csharp
+// ❌ 冗長的 if-else
+public string Grade(int score)
+{
+    if (score >= 90) { return "優"; }
+    else if (score >= 60) { return "及格"; }
+    else { return "不及格"; }
+}
+
+// ✅ switch 表達式（依「範圍」分支，一目了然）
+public string Grade(int score) => score switch
+{
+    >= 90 => "優",
+    >= 60 => "及格",
+    _     => "不及格"
+};
+
+// ❌ 冗長迴圈：篩選 + 轉換
+var result = new List<string>();
+foreach (var t in todos)
+{
+    if (t.IsDone)
+        result.Add(t.Title);
+}
+
+// ✅ LINQ（宣告式：先篩再取，讀起來就像在描述意圖）
+var result = todos.Where(t => t.IsDone).Select(t => t.Title).ToList();
+
+// ❌ 一行 getter 卻寫成完整方法本體
+public string GetName() { return _name; }
+// ✅ 表達式主體成員
+public string GetName() => _name;
+```
+
+驗收：改完後別人一眼看得懂「在做什麼」。提醒——LINQ 別鏈太長到難讀、switch 表達式記得有 `_` 兜底；簡潔的前提永遠是「好懂優先」，不是炫技。
+
+**練習 3：跑 `dotnet format`（動手題）**
+
+做法：在專案根目錄跑 `dotnet format`（或 `dotnet format --verify-no-changes` 先看會改哪些而不實際改）。它依 `.editorconfig` 的規則統一風格。
+
+它通常會統一：縮排（空格/tab 與層數）、行尾多餘空白、大括號位置、`using` 的排序與移除未使用的、多餘空行、運算子前後空白等——都是**純格式、不改變程式行為**的東西。
+
+驗收點：跑完用 `git diff` 看改了哪些，會發現全是排版差異、邏輯沒變。建議搭配 `.editorconfig` 定義團隊風格，並在 CI 用 `dotnet format --verify-no-changes` 把「保持乾淨」自動化，不靠人工盯。
+
+> ⚠️ 動手題，實際改了哪些請自行在專案跑並用 `git diff` 觀察驗證。
+
+</details>
+
 ## 課外讀物
 
 > Clean Code 完整 → [課外讀物 E-6：Clean Code 總覽](../../../課外讀物/E-6-best-practices/E-6-1-what-is-clean-code.md)、[命名](../../../課外讀物/E-6-best-practices/E-6-2-naming.md)、[註解](../../../課外讀物/E-6-best-practices/E-6-5-comments.md)、[後端 Clean Code](../../../課外讀物/E-6-best-practices/E-6-8-backend-clean-code.md)

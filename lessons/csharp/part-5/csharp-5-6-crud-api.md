@@ -148,6 +148,53 @@ dotnet run
 2. 加一個端點 `GET /api/todos?done=true`——用 `[FromQuery] bool? done` 篩選「只看已完成/未完成」（提示：LINQ 的 Where）。
 3. 觀察：重啟 `dotnet run` 後，之前新增的待辦不見了——想想為什麼（記憶體 vs 持久化），這正是 Part 6 要解決的。
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：完整打出來、Swagger 走一遍（動手題）**
+
+做法：把上面「模型與 DTO」「完整的 Controller」照抄進一個 ASP.NET Core Web API 專案，`dotnet run` 後打開 `/swagger`，依「測試你的 API」那段的順序操作。
+
+驗收點（每一步要看到的狀態碼）：
+
+- `POST /api/todos` body `{"title":"學 C#"}` → **201 Created**，回應 header 有 `Location` 指向新資源，body 是剛建立的 `TodoDto`。
+- 故意送空的 `{"title":""}` → **400 Bad Request**（`StringLength` 的 `MinimumLength=1` 擋下），這證明驗證有生效。
+- `GET /api/todos` → **200**，看到剛建立那筆。
+- `PUT /api/todos/1` body `{"title":"學 C#","isDone":true}` → **204 No Content**。
+- `GET /api/todos/1` → **200** 且 `isDone` 變 `true`。
+- `DELETE /api/todos/1` → **204**；再 `GET /api/todos/1` → **404 Not Found**。
+
+> ⚠️ 這是動手題，狀態碼與畫面請自行實機在 Swagger 驗證。若 `POST` 沒回 201 或驗證沒擋，先檢查有沒有加 `[ApiController]`（它會自動觸發模型驗證與 400）。
+
+**練習 2：加篩選端點 `GET /api/todos?done=true`**
+
+用 `[FromQuery] bool? done` 接查詢字串，`bool?`（可空）代表「沒帶這個參數就是 null，回傳全部」；有帶才用 LINQ 的 `Where` 篩：
+
+```csharp
+// === R：列出全部，可選用 ?done=true / ?done=false 篩選 ===
+[HttpGet]
+public IActionResult GetAll([FromQuery] bool? done)
+{
+    // 從全部開始；有帶 done 才加條件（沒帶就回全部）
+    var query = _todos.AsEnumerable();
+    if (done.HasValue)
+        query = query.Where(t => t.IsDone == done.Value);
+
+    var dtos = query.Select(t => new TodoDto(t.Id, t.Title, t.IsDone));
+    return Ok(dtos);
+}
+```
+
+驗收點：`GET /api/todos`（不帶參數）→ 全部；`GET /api/todos?done=true` → 只剩已完成；`?done=false` → 只剩未完成。用 `bool?` 而不是 `bool` 是關鍵——這樣「不帶參數」和「帶 false」才能區分開。
+
+**練習 3：為什麼重啟後資料不見了？**
+
+因為資料存在 `static List<TodoItem>` 裡，也就是**程式行程（process）的記憶體（RAM）**。RAM 是揮發性的（cs 課程 Part 3-5）——程式一結束，這塊記憶體就被作業系統回收，`List` 裡的東西自然全部消失，下次 `dotnet run` 是一個全新的空 `List`。
+
+要讓資料「重啟後還在」，就得把它寫到**非揮發性的持久化儲存**（硬碟上的資料庫檔案 / 資料庫伺服器）。這正是 Part 6 用 EF Core 接資料庫要解決的事：`SaveChanges` 會把資料真的寫進資料庫，程式重啟後再查回來還在。
+
+</details>
+
 ## 課外讀物
 
 > 整合的觀念 → 複習 [csharp-5-1]~[csharp-5-5]；對照 Rust 的 Todo API → **rust 課程 [rust-9-6]**

@@ -130,6 +130,80 @@ Repository 層：IProjectRepository、ITaskRepository...
 2. **品質**：為業務規則寫單元測試、為關鍵端點寫整合測試，確保 `dotnet test` 全綠。
 3. **部署**：把它容器化成 Docker image，在本機 `docker run` 跑起來。進階：設一個 GitHub Actions CI 流程（至少自動跑測試）。
 
+<details>
+<summary>參考解答</summary>
+
+這是畢業專案，沒有唯一標準答案。下面給**解題大綱、關鍵程式碼骨架、以及驗收清單**，你照著長出自己的實作即可；實際能不能跑、測試綠不綠、容器起不起得來，都需要你在本機實機驗證。
+
+**練習 1（核心）解題大綱**
+
+建議由內而外、分層一次一層做，做完一層就用 Swagger 手動驗一次：
+
+1. **領域模型 + 資料庫**：把 `User`、`Project`、`TaskItem` 三個實體（含關聯，csharp-6-5）放進 `AppDbContext`，`dotnet ef migrations add Init` → `database update` 建表。
+2. **Repository 層**：`IProjectRepository`、`ITaskRepository`…，實作用 EF Core，只負責資料存取（csharp-9-1）。
+3. **Service 層**：`ProjectService`、`TaskService`…，放**業務規則與權限檢查**（例如「只能動自己的專案」），依賴 Repository 介面。
+4. **Controller 層**：只管 HTTP——路由、DTO 驗證、狀態碼、從 JWT 取出目前使用者身分，呼叫 Service。
+5. **認證授權（Part 7）**：註冊用 `PasswordHasher` 雜湊密碼（絕不存明文，csharp-7-4），登入成功發 JWT；用 `[Authorize]` 保護端點，資源權限在 Service 檢查 `OwnerId == 目前使用者Id`，管理員（Role=Admin）放行全部。
+6. 全部用 DI 串接（`Program.cs` 註冊介面對應實作，csharp-4-4）。
+
+權限檢查的骨架（資源型授權的核心，別漏）：
+
+```csharp
+public async Task<Project> GetProjectForUserAsync(int projectId, int currentUserId, string role)
+{
+    var project = await _projectRepo.FindAsync(projectId)
+        ?? throw new NotFoundException($"找不到 ID 為 {projectId} 的專案");
+
+    // 只能動自己的；管理員例外
+    if (project.OwnerId != currentUserId && role != "Admin")
+        throw new ForbiddenException("你沒有權限存取這個專案");
+
+    return project;
+}
+```
+
+Controller 從 JWT 取身分：`int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!)`、`User.FindFirstValue(ClaimTypes.Role)`。
+
+**練習 2（品質）解題大綱**
+
+- **單元測試業務規則**：測 Service 層，Repository 用假物件（mock / 記憶體實作）替換，專注驗「規則對不對」。至少涵蓋：非擁有者存取別人的專案 → 丟 `ForbiddenException`；擁有者可存取；管理員可存取任何人的。
+- **整合測試 API 流程**：用 `WebApplicationFactory` 打真實管線（可接測試用資料庫或 InMemory），驗一條完整流程：註冊 → 登入拿 JWT → 帶 token 建專案 → 建任務 → 標記完成 → 未帶/錯 token 應回 401。
+- 驗收：`dotnet test` 全綠。
+
+**練習 3（部署）解題大綱**
+
+多階段 `Dockerfile`（build 用 SDK image、執行用較小的 runtime image）：
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish -c Release -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /app .
+ENTRYPOINT ["dotnet", "TaskManager.dll"]
+```
+
+`docker build -t taskmanager .` → `docker run -p 8080:8080 ...`（資料庫連線、JWT 密鑰等**機密走環境變數**，別寫死進 image，csharp-9-3）。進階 GitHub Actions：push 觸發 → `dotnet restore/build/test`（至少自動跑測試）→ 通過再 build image。
+
+**整體驗收清單**（對照本章「驗收清單」逐項打勾，都要自行實機驗證）
+
+- [ ] 使用者、專案、任務完整 CRUD，RESTful + 正確狀態碼（201/204/400/401/403/404）。
+- [ ] 密碼雜湊儲存（絕不存明文）；JWT 登入；`[Authorize]` 保護端點。
+- [ ] 資源權限：只能管自己的專案/任務；管理員能管全部（正、反面都測過）。
+- [ ] 資料存進真實資料庫（EF Core + Migration），重啟後資料還在。
+- [ ] 分層 Controller / Service / Repository，依賴介面 + DI，關聯查詢有留意 N+1（用 Include）。
+- [ ] 日誌、健康檢查（`/health`）、機密走環境變數/密鑰服務。
+- [ ] 單元 + 整合測試，`dotnet test` 全綠。
+- [ ] `Dockerfile` 能 build，`docker run` 起得來、打得到 API。
+- [ ] （進階）CI 至少自動跑測試；部署上雲並設 HTTPS/監控。
+
+> ⚠️ 這是完整專案，能跑、測試綠、容器起得來都必須自己在本機/雲端實機驗證——文件與 review 都取代不了真正跑一遍。
+
+</details>
+
 ## 課外讀物
 
 > 🎓 **恭喜你完成 C# 後端開發課程！** 從語言基礎、OOP、ASP.NET Core、資料庫、認證、測試，到部署上線——你已經能獨立開發一個正式級的 C# 後端服務。

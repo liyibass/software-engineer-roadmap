@@ -106,6 +106,85 @@ Arc<Mutex<T>>：共享所有權(Arc) + 安全修改(Mutex) → 兩個問題都�
 2. 用 `Arc<Mutex<Vec<i32>>>` 讓三個執行緒各自往同一個向量 `push` 一個數字，最後印出向量（順序可能不定，但會有三個元素）。
 3. 思考題：如果把上面例子的 `Mutex` 拿掉、讓執行緒直接改共享的數字，Rust 會發生什麼事？（提示：能編譯嗎？）
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題（計數器一定是 10 / 100）**
+
+直接沿用本章例子即可。只要把外層迴圈的 `0..10` 改成 `0..100`，最後一定印出 100：
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..100 {                          // 改成 100
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("最終計數：{}", *counter.lock().unwrap());   // 一定是 100
+}
+```
+
+驗收點（需自行實機執行）：重複跑很多次，結果**永遠**是 100，不會少數。因為 `Mutex` 保證「加 1」這個動作一次只有一個執行緒能做，不會有兩個執行緒同時讀到同一個舊值、各加 1 後互相覆蓋。
+
+**第 2 題（三個執行緒往同一個 Vec push）**
+
+把 `Vec` 用 `Mutex` 保護、再用 `Arc` 共享：
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let numbers = Arc::new(Mutex::new(Vec::<i32>::new()));
+    let mut handles = vec![];
+
+    for n in 1..=3 {
+        let numbers = Arc::clone(&numbers);
+        let handle = thread::spawn(move || {
+            let mut vec = numbers.lock().unwrap();   // 取得鎖
+            vec.push(n);                             // 安全地 push
+        });   // 鎖在這裡自動釋放
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // 排序只是為了印出來好看，因為 push 進去的順序不定
+    let mut result = numbers.lock().unwrap().clone();
+    result.sort();
+    println!("{:?}", result);   // [1, 2, 3]（三個元素，內容固定，push 順序不定）
+}
+```
+
+驗收點：向量最後**一定有三個元素**（1、2、3 各一個），但它們被 push 進去的先後順序每次可能不同——這也是並行不決定順序的體現。重點是：不會因為同時 push 而少了元素或讓 `Vec` 內部結構壞掉，因為 `Mutex` 讓三個 push 排隊進行。
+
+**第 3 題（拿掉 Mutex 會怎樣）**
+
+**編譯不會過。** 如果你想讓多個執行緒直接改一個共享的 `i32`（例如用 `Arc<i32>` 然後試圖 `*num += 1`），編譯器會拒絕，理由大致是：
+
+- `Arc<i32>` 只給你共享的**唯讀**存取（`&i32`），你根本拿不到 `&mut` 去改它——`Arc` 本身不允許透過它拿到可變借用。
+- 就算你想繞過去共享一個 `&mut i32` 給多個執行緒，也會撞到借用規則（可變借用只能有一個）與 `Send`/`Sync` 檢查。
+
+換句話說，Rust **不是等你跑出資料競爭才報錯，而是根本不讓這種程式編譯成功**。想安全地「共享 + 修改」，你被逼著加上 `Mutex`（提供內部可變性 + 互斥）。這就是編譯器逼你寫對——無懼並行的另一面。
+
+</details>
+
 ## 課外讀物
 
 > 互斥鎖、死結、競爭條件的完整原理 → **cs 課程 Part 5：作業系統（並行）**

@@ -105,6 +105,53 @@ graph TB
 2. 把上題改成 `if let ... else`，沒值時印出「（空）」。
 3. 用 `while let` 把一個 `vec![10, 20, 30]` 的元素一個個 `pop()` 出來印掉，觀察印出的順序（先進的後出，呼應堆疊的後進先出）。
 
+<details>
+<summary>參考解答</summary>
+
+**第 1 題**：只在有值時做事，正是 `if let` 的招牌場景，不用寫多餘的 `None` 分支。
+
+```rust
+fn main() {
+    let name: Option<String> = Some(String::from("Amy"));
+
+    if let Some(n) = name {
+        println!("名字是 {}", n);   // 有值才印
+    }
+    // 若是 None，這段直接跳過
+}
+```
+
+**第 2 題**：加上 `else`，沒值時走 `else` 分支。
+
+```rust
+fn main() {
+    let name: Option<String> = None;
+
+    if let Some(n) = name {
+        println!("名字是 {}", n);
+    } else {
+        println!("（空）");        // None 時走這裡
+    }
+}
+```
+
+**第 3 題**：`pop()` 每次拿走最後一個元素、回傳 `Option`，空了就回 `None`，迴圈自然結束。
+
+```rust
+fn main() {
+    let mut nums = vec![10, 20, 30];
+
+    while let Some(top) = nums.pop() {
+        println!("取出 {}", top);
+    }
+    // 印出順序：30、20、10
+}
+```
+
+印出來是 30 → 20 → 10。原因是 `pop()` 從尾端拿，最後 push 進去的 30 最先被取出——這正是堆疊「後進先出（LIFO）」的行為：先放進去的 10 反而最後才出來。
+
+</details>
+
 ## 課外讀物
 
 > `while let` + `pop()` 體現的是「堆疊（後進先出）」的行為 → **dsa 課程 Part 2：堆疊（Stack）**

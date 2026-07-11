@@ -145,6 +145,73 @@ foreach (var user in users)
 2. 用 `Include` 查一個 Blog 並一起載入它的所有 Post，印出來。
 3. 思考題：什麼是 N+1 查詢問題？為什麼它很隱蔽？怎麼用 Include 避免？
 
+<details>
+<summary>參考解答</summary>
+
+**練習 1：設計 Blog 一對多 Post**
+
+一對多的關鍵：「一」端放對方的 `List`（導覽屬性），「多」端放**外鍵**（`XxxId`）＋指回「一」端的導覽屬性。EF Core 會依慣例（`BlogId` 對應 `Blog.Id`）自動建好關聯：
+
+```csharp
+public class Blog
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = "";
+
+    // 導覽屬性：一個 Blog 有多篇 Post（一對多的「多」端）
+    public List<Post> Posts { get; set; } = new();
+}
+
+public class Post
+{
+    public int Id { get; set; }
+    public string Content { get; set; } = "";
+
+    public int BlogId { get; set; }        // 外鍵：這篇 Post 屬於哪個 Blog
+    public Blog Blog { get; set; } = null!; // 導覽屬性：從 Post 拿回它的 Blog
+}
+```
+
+`= null!` 是告訴編譯器「這個非可空導覽屬性會由 EF Core 填好，別對我警告」（配合可空參考型別，csharp-3-6）。定義完別忘了 `dotnet ef migrations add ...` 建表（外鍵會自動建好）。
+
+**練習 2：用 `Include` 載入一個 Blog 的所有 Post**
+
+預設查詢不會自動載入關聯，一定要 `Include` 明講：
+
+```csharp
+var blog = await _db.Blogs
+    .Include(b => b.Posts)                      // 明確要求一起載入 Posts
+    .FirstOrDefaultAsync(b => b.Id == id);
+
+if (blog is null) return;                        // 查無資料要處理
+
+Console.WriteLine($"部落格：{blog.Title}");
+foreach (var post in blog.Posts)                 // 有 Include 才有資料
+    Console.WriteLine($"  - {post.Content}");
+```
+
+沒有 `Include` 的話，`blog.Posts` 會是空的（不是 null，是沒載入內容的空集合），迴圈就印不出東西——這也是很多人第一次踩的坑。
+
+**練習 3：N+1 是什麼？為什麼隱蔽？怎麼避免？**
+
+- **是什麼**：先用 1 次查詢撈回 N 筆主資料（例如 N 個 User），接著在迴圈裡「每一筆各發一次查詢」去拿它的關聯資料，於是總共發了 `1 + N` 次查詢。100 個 User 就是 101 次資料庫來回，資料庫被打爆、回應超慢。
+
+- **為什麼隱蔽**：程式碼「看起來完全正常」——就是一個很自然的 `foreach` 迴圈，沒有任何錯誤或警告。慢的原因藏在「每次存取關聯屬性背後偷偷發了一次 SQL」，你不看實際生成的 SQL 根本不會察覺。而且資料量小時（測試環境幾筆資料）感覺不出來，一上正式環境資料一多就爆——所以特別容易漏掉。
+
+- **怎麼避免**：用 `Include` 在「一開始就一次把關聯載入」，EF Core 會改用 JOIN，把 `1 + N` 次壓成 1～2 次查詢：
+
+```csharp
+var users = await _db.Users
+    .Include(u => u.Todos)   // 一次載入所有人的 Todos，消滅 N+1
+    .ToListAsync();
+foreach (var user in users)
+    foreach (var todo in user.Todos) { /* 已載好，不會再各發查詢 */ }
+```
+
+養成習慣：迴圈裡要碰關聯資料前，先問「我有沒有 Include？」，並偶爾看一眼 EF Core 生成的 SQL 確認查詢次數。
+
+</details>
+
 ## 課外讀物
 
 > N+1 問題深入 → [課外讀物 E-4-4：N+1 問題](../../../課外讀物/E-4-database/E-4-4-n-plus-one.md)、[課外讀物 E-11-4：資料庫效能](../../../課外讀物/E-11-performance/E-11-4-database-performance.md)
