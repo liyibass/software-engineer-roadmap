@@ -79,37 +79,78 @@ Access-Control-Allow-Origin: http://localhost:5173
 
 ## Preflight Request：正式開打前的偵察兵
 
-有時候瀏覽器在送出真正的請求之前，會先悄悄送一個「問路」的請求，叫做 **Preflight Request（預檢請求）**。
+有時候瀏覽器在送出真正的請求之前，會先悄悄送一個「問路」的請求，叫做 **Preflight Request（預檢請求）**。它用的 HTTP 方法是 `OPTIONS`，意思是：「欸，我接下來想送一個帶 JSON 的請求，你允許嗎？」
 
-它用的 HTTP 方法是 `OPTIONS`，意思是：「欸，我接下來想送一個 POST 請求，帶著 JSON 資料，你允許嗎？」
+但這裡有個關鍵問題很多人跳過，結果就是「看過卻沒真的懂」——
+
+### 為什麼要先問？因為有些請求「先斬後奏」就來不及了
+
+回想上面同源政策的核心：**CORS 保護的是「伺服器」不被非預期的跨站請求傷害。**
+
+現在想像沒有預檢的世界：
+
+```
+你登入了 bank.com，瀏覽器存了你的 cookie
+       ↓
+你不小心逛到惡意網站 evil.com
+       ↓
+evil.com 的 JavaScript 偷偷送出：
+   DELETE https://bank.com/account  （瀏覽器會自動帶上你的 cookie！）
+```
+
+如果瀏覽器毫無防備就直接把這個 `DELETE` 送出去，**等伺服器收到時，破壞已經造成了**——就算伺服器接著回「不准跨來源」，帳戶可能早就被刪掉了。像 `DELETE`、`PUT` 這種**有副作用**（會改變伺服器狀態）的請求，「先送了再說」根本來不及。
+
+所以瀏覽器的策略是：**對「可能有副作用」的請求，先派一個偵察兵（OPTIONS）去問過，伺服器點頭才送真正的那一發。** 這就是 preflight 的真正目的。
+
+> **關鍵記憶點**：preflight 不是為了「確認能不能讀到回應」（那是一般 CORS header 在做的事），而是為了**在造成傷害前先攔住有副作用的請求**。
+
+### 簡單請求 vs 非簡單請求：判斷會不會觸發
+
+瀏覽器把跨來源請求分成兩類。**簡單請求（simple request）**不會觸發 preflight，直接送；只要**跳脫**簡單請求的條件，就得先預檢。
+
+一個請求要算「簡單請求」，必須**同時**滿足：
+
+- 方法是 `GET`、`HEAD`、`POST` 其中之一
+- 沒有加自訂 header（只用了 `Accept`、`Content-Type` 等少數安全 header）
+- `Content-Type` 只能是 `application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain`
+
+**只要違反任一條，就會先 preflight。** 最常見的觸發情境：
+
+| 你做了什麼 | 為什麼觸發 |
+|---|---|
+| 用 `PUT` / `DELETE` / `PATCH` | 非簡單方法，通常有副作用 |
+| 送 JSON（`Content-Type: application/json`） | JSON 不在簡單清單裡——實務上**最常見**的觸發原因 |
+| 帶自訂 header（如 `Authorization`、`X-Api-Token`） | 自訂 header 需要先報備 |
+
+> 💡 這就是為什麼你發一個帶 JSON 的 POST，Network 面板卻跑出**兩個**請求——多出來那個 `OPTIONS` 就是 preflight，不是你寫錯。
+
+### 一次 preflight 的完整來回
 
 ```mermaid
 sequenceDiagram
     participant B as 瀏覽器
     participant S as 伺服器（port 3000）
 
-    Note over B: 要發送 POST /api/users<br/>帶 Content-Type: application/json
+    Note over B: 要發送 DELETE /api/users/5<br/>帶 Authorization → 非簡單請求，先預檢
 
-    B->>S: OPTIONS /api/users<br/>Origin: http://localhost:5173<br/>Access-Control-Request-Method: POST<br/>Access-Control-Request-Headers: Content-Type
-    S->>B: 204 No Content<br/>Access-Control-Allow-Origin: http://localhost:5173<br/>Access-Control-Allow-Methods: GET, POST<br/>Access-Control-Allow-Headers: Content-Type
+    B->>S: ① OPTIONS /api/users/5<br/>Origin: http://localhost:5173<br/>Access-Control-Request-Method: DELETE<br/>Access-Control-Request-Headers: Authorization
+    S->>B: ② 204 No Content<br/>Access-Control-Allow-Origin: http://localhost:5173<br/>Access-Control-Allow-Methods: GET, DELETE<br/>Access-Control-Allow-Headers: Authorization<br/>Access-Control-Max-Age: 86400
 
-    Note over B: 伺服器說可以，正式發送
+    Note over B: 伺服器說「准」→ 才送真正的請求
 
-    B->>S: POST /api/users<br/>Content-Type: application/json<br/>{"name": "Alice"}
-    S->>B: 201 Created<br/>{"id": 1, "name": "Alice"}
+    B->>S: ③ DELETE /api/users/5<br/>Authorization: ...
+    S->>B: ④ 200 OK（真正執行刪除）
 ```
 
-這張圖說的是：瀏覽器在送真正的 POST 之前，先用 OPTIONS 確認伺服器是否同意，確認後才發正式請求。
+這張圖的重點：**真正有副作用的 ③ 只有在 ② 回覆「允許」後才送出。** 如果 ② 沒有回對的 `Access-Control-Allow-*` header，瀏覽器會**直接擋下 ③**，你的 `fetch` 就爆 CORS error——而且此時真正的請求**根本沒送到伺服器**，什麼都沒發生。
 
-**什麼時候會觸發 Preflight？**
+### 三個實務上一定要知道的細節
 
-不是每個請求都需要 Preflight。以下幾種情況才會觸發：
+1. **preflight 是瀏覽器自動做的，你控制不了。** 你只寫了 `fetch(url, { method: "DELETE" })`，那個 `OPTIONS` 是瀏覽器背著你偷偷發的，程式碼裡看不到。
 
-- 使用了 `PUT`、`DELETE`、`PATCH` 等方法（GET、POST 有時不會觸發）
-- 加了自訂的請求 header（例如 `Authorization`）
-- `Content-Type` 是 `application/json`（不是 `text/plain` 或 `multipart/form-data`）
+2. **`Access-Control-Max-Age` 可以快取預檢結果。** 上圖的 `86400`（秒 = 一天）代表：接下來一天內，對同樣的請求瀏覽器就不用再 preflight，直接送真正的請求。沒有它的話，每個 JSON 請求都要跑兩趟，很浪費。
 
-這也是為什麼你有時候發一個帶 JSON 的 POST，卻看到主控台出現兩個請求——一個 OPTIONS，一個才是你的 POST。
+3. **preflight 只發生在瀏覽器。** 用 Postman、curl、或後端對後端呼叫**都不會有 preflight**——因為 CORS 是瀏覽器強加的規則，其他 client 不理這套。所以「**Postman 打得通、瀏覽器卻 CORS error**」幾乎都是 preflight/CORS header 沒設好，不是你的 API 壞了。
 
 ---
 
@@ -202,7 +243,8 @@ access control check: No 'Access-Control-Allow-Origin' header...
 - 瀏覽器的 Same-Origin Policy 阻止 JavaScript 讀取不同源的回應，目的是防止惡意網站偷資料
 - 「同源」的定義是：協定、域名、端口三個都一樣
 - CORS 讓伺服器主動宣告允許哪些源，透過 `Access-Control-Allow-Origin` header 告訴瀏覽器
-- 部分請求（帶 JSON、自訂 header 等）會先觸發 OPTIONS 預檢請求，確認伺服器同意後才送真正的請求
+- 帶副作用的請求（用 `PUT`/`DELETE`、帶 JSON、帶自訂 header 等「非簡單請求」）會先觸發 OPTIONS 預檢，**目的是在造成傷害前先問過伺服器**，同意後才送真正的請求；預檢失敗時真正的請求根本不會送出
+- 預檢只發生在瀏覽器——Postman／curl 不會有，所以「Postman 通、瀏覽器不通」通常就是 CORS 沒設好
 - 解法：在 Express 加上 cors middleware，指定具體的 origin，不要圖方便用 `"*"`
 
 下次看到那個紅色錯誤，至少你知道要去伺服器端加 header，而不是在前端東改西改。

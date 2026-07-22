@@ -92,7 +92,8 @@ Redis 不只是 Key-Value 字串存取，它支援幾種實用的資料結構：
 
 應用程式自己負責管理快取。流程長這樣：
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant App as 應用程式
     participant Redis as Redis 快取
     participant DB as 資料庫
