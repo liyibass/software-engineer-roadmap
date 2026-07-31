@@ -78,16 +78,16 @@ http://192.168.10.90/app/       → 98:8080
 ### 選項 B：子網域路由 ← **採用**
 
 ```
-http://grafana.home.arpa   → 98:3000
-http://app.home.arpa       → 98:8080
-http://worker.home.arpa    → 97:xxxx
+http://grafana.liyibass.internal   → 98:3000
+http://app.liyibass.internal       → 98:8080
+http://worker.liyibass.internal    → 97:xxxx
 ```
 
 Nginx 設定變得極簡：
 
 ```nginx
 server {
-    server_name grafana.home.arpa;
+    server_name grafana.liyibass.internal;
     location / {
         proxy_pass http://192.168.10.98:3000;
     }
@@ -125,13 +125,13 @@ http://192.168.10.90:8080  → App
 ## 實作計畫
 
 1. ✅ 在 `90` 上安裝 **dnsmasq**，提供區網 DNS
-2. ✅ 加入解析紀錄：`grafana.home.arpa` → **`192.168.10.90`**
+2. ✅ 加入解析紀錄：`grafana.liyibass.internal` → **`192.168.10.90`**
 3. ✅ 改寫 Nginx，從 `location` 分流改為 `server_name` 分流
 4. ✅ 移除 Grafana 的 `serve_from_sub_path=true`（不再需要）
 5. 🔴 讓區網裝置使用 `90` 當 DNS（需操作路由器）
 
 > ⚠️ **第 2 步曾經寫錯，值得記下來。**
-> 本文原先寫「`grafana.home.arpa` → `192.168.10.98`」——**指向後端機器是錯的**。
+> 本文原先寫「`grafana.liyibass.internal` → `192.168.10.98`」——**指向後端機器是錯的**。
 >
 > 服務名稱必須指向 **`192.168.10.90`（反向代理）**。流量要先進 nginx，
 > 才輪得到它依 `server_name` 分流。若 DNS 直接指向 98：
@@ -142,16 +142,26 @@ http://192.168.10.90:8080  → App
 > 直覺上會覺得「名字就該指向那個服務真正住的地方」，但在反向代理架構下，
 > **對外的門牌號碼是代理的位址，不是後端的位址**。
 
-### 為什麼用 `.home.arpa`？
+### 網域怎麼選？
 
 | 域名 | 問題 |
 |---|---|
 | `.local` | ❌ 被 mDNS（Bonjour / Avahi）保留，會跟 Apple 裝置打架 |
 | `.lan`、`.home` | ⚠️ 沒有正式標準，未來有機會變成真實的頂級域名 |
 | `.dev`、`.app` | ❌ **是真的頂級域名**，而且被 Google 強制 HTTPS，區網用會出事 |
-| `.home.arpa` | ✅ **RFC 8375 正式保留給家用網路**，永遠不會跟公網衝突 |
+| `.home.arpa` | ✅ RFC 8375 保留給家用網路，永遠不會跟公網衝突 |
+| **`.internal`** | ✅ **ICANN 於 2024 年保留給私有網路 ← 最終採用** |
 
 > 用 `.dev` 當本機開發域名曾經是常見做法，直到 Google 買下 `.dev` 並加入 HSTS preload 清單——全世界的 `.dev` 一夜之間被瀏覽器強制導向 HTTPS，無數開發環境當場爆炸。**這就是為什麼要用有標準保障的保留域名。**
+
+> **2026-08-01 補充：最初實作用的是 `.home.arpa`，同日稍後改為 `.liyibass.internal`。**
+>
+> 兩者的保障等價（都是標準明文規定永不委派，性質等同 `192.168.x.x` 之於 IP），
+> 改用 `.internal` 純粹是可讀性——它允許在中間放自己的識別，
+> `grafana.liyibass.internal` 比 `grafana.home.arpa` 一看就知道是誰的。
+>
+> 遷移採**新舊並存**：dnsmasq 兩組 `host-record`、nginx 的 `server_name` 列兩個名字，
+> 所以套用時機完全不影響服務。確認無人使用舊名稱後再移除。
 
 ---
 
@@ -202,7 +212,7 @@ http://192.168.10.90:8080  → App
 
 直覺會想寫「主要 = `192.168.10.90`，次要 = `8.8.8.8` 當備援」。**不要這樣做**，這會製造間歇性故障。
 
-原因是：**DNS 客戶端不保證「主要失敗才問次要」**。不少作業系統（含 macOS / iOS）會並行查詢，或在主要回應較慢時直接改問次要。只要有一次查詢跑到 `8.8.8.8`，`grafana.home.arpa` 就是 NXDOMAIN——症狀是**時好時壞、重試一次又好了**，屬於最難查的那一類故障。
+原因是：**DNS 客戶端不保證「主要失敗才問次要」**。不少作業系統（含 macOS / iOS）會並行查詢，或在主要回應較慢時直接改問次要。只要有一次查詢跑到 `8.8.8.8`，`grafana.liyibass.internal` 就是 NXDOMAIN——症狀是**時好時壞、重試一次又好了**，屬於最難查的那一類故障。
 
 正確做法：**次要留空**，或同樣填 `192.168.10.90`。公網名稱的解析交給 dnsmasq 自己往上游轉發（已設定 `192.168.10.1` + `1.1.1.1`）。
 
@@ -211,7 +221,7 @@ http://192.168.10.90:8080  → App
 
 ### 還要測的
 
-- [ ] 設定完後，測一台**連在 EasyMesh 子節點上的裝置**能否解析 `.home.arpa`。
+- [ ] 設定完後，測一台**連在 EasyMesh 子節點上的裝置**能否解析 `.liyibass.internal`。
       這種拓樸偶爾會有子節點自己攔截 DNS 的行為。
 
 ---

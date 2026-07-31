@@ -16,7 +16,7 @@
 
 ## 起點：一個很合理的問題
 
-要讓區網裝置用 `grafana.home.arpa` 而不是 `192.168.10.90/grafana/` 存取服務，需要一台 DNS 伺服器來回答這個名字。
+要讓區網裝置用 `grafana.liyibass.internal` 而不是 `192.168.10.90/grafana/` 存取服務，需要一台 DNS 伺服器來回答這個名字。
 
 第一個念頭是：**路由器不是本來就有 DNS 嗎？**
 
@@ -126,7 +126,7 @@ dnsmasq           = 社區的總機
 
 它做兩件事：
 
-**1. 對 `.home.arpa` 當權威伺服器**——這是我們自己編的名字，全世界沒有任何 DNS 知道它。dnsmasq 內建名冊，問到就直接回答。
+**1. 對 `.liyibass.internal` 當權威伺服器**——這是我們自己編的名字，全世界沒有任何 DNS 知道它。dnsmasq 內建名冊，問到就直接回答。
 
 **2. 其他名字轉發上游並快取**——`google.com` 不認識，就轉問上游，拿到答案存起來，下次直接回。
 
@@ -189,37 +189,54 @@ server=1.1.1.1
 
 ```conf
 # ── 本地網域 ──
-local=/home.arpa/
-domain=home.arpa
+local=/liyibass.internal/
+domain=liyibass.internal
 ```
 
 `local=` 表示這個網域由本機權威回答，查不到就回 NXDOMAIN，**絕不往上游轉發**——避免內部主機名稱洩漏到公共 DNS。
 
-### 為什麼用 `.home.arpa`？
+### 網域怎麼選？
 
-| 域名 | 問題 |
+選擇標準只有一個：**確定不會跟公網衝突**。你自己編的名字如果哪天變成真實的頂級域名，你的內網就會開始出現詭異的解析結果。
+
+| 域名 | 評價 |
 |---|---|
 | `.local` | ❌ 被 mDNS（Bonjour / Avahi）保留，會跟 Apple 裝置打架 |
-| `.lan`、`.home` | ⚠️ 沒有正式標準，未來可能變成真實的頂級域名 |
-| `.dev`、`.app` | ❌ **是真的頂級域名**，且被瀏覽器強制 HTTPS |
-| `.home.arpa` | ✅ **RFC 8375 正式保留給家用網路** |
+| `.lan`、`.home` | ⚠️ 沒有正式標準，只是「大家習慣這樣用」 |
+| `.dev`、`.app` | ❌ **是真的頂級域名**，且在 HSTS preload 清單裡，瀏覽器強制 HTTPS |
+| `.home.arpa` | ✅ RFC 8375 保留給家用網路 |
+| **`.internal`** | ✅ **ICANN 於 2024 年保留給私有網路 ← 本次採用** |
 
-> 用 `.dev` 當本機開發域名曾經是常見做法，直到 Google 買下 `.dev` 並加入 HSTS preload 清單——
-> 全世界的 `.dev` 一夜之間被瀏覽器強制導向 HTTPS，無數開發環境當場爆炸。
-> **這就是為什麼要用有標準保障的保留域名。**
+> `.dev` 那個坑值得記住：它曾經是最流行的本機開發域名，直到 Google 買下 `.dev`
+> 並加進 HSTS preload 清單——全世界的 `.dev` 開發環境一夜之間被瀏覽器強制導向 HTTPS，
+> 全部爆炸。**這就是為什麼要用有標準保障的保留域名。**
+
+`.home.arpa` 和 `.internal` 兩者的保障是等價的（都是標準明文規定「永遠不會委派給任何人」，性質等同 `192.168.x.x` 之於 IP）。**最後選 `.internal` 純粹是可讀性**——它允許你在中間放自己的識別：
+
+```
+grafana.home.arpa            ← 每個人的內網都長一樣
+grafana.liyibass.internal    ← 一看就知道是誰的
+```
+
+> 💡 這次的改名也順便示範了**零停機遷移**的標準手法：
+> dnsmasq 同時保留兩組 `host-record`、nginx 的 `server_name` 同時列兩個名字，
+> 兩者並存確認無誤後，才移除舊的。
+>
+> **改名字時永遠先並存，再切換，最後才清理。** 雖然本次其實沒有東西依賴舊名稱
+> （它只存在約一小時、僅被 `curl` 測試過），照標準流程做才會變成習慣。
 
 ```conf
 # ── 名稱對應 ──
-host-record=jump.home.arpa,192.168.10.90
-host-record=services.home.arpa,192.168.10.98
-host-record=grafana.home.arpa,192.168.10.90     # ← 注意這一行
+host-record=jump.liyibass.internal,192.168.10.90
+host-record=services.liyibass.internal,192.168.10.98
+host-record=grafana.liyibass.internal,192.168.10.90     # ← 注意這一行
 ```
 
 ---
 
 ## 最容易搞錯的一點：名字要指向誰？
 
-直覺會覺得「`grafana.home.arpa` 當然要指向 Grafana 真正住的地方，也就是 `192.168.10.98`」。
+直覺會覺得「`grafana.liyibass.internal` 當然要指向 Grafana 真正住的地方，也就是 `192.168.10.98`」。
 
 **這是錯的。**（本次規劃文件一開始就寫錯了，後來才修正。）
 
@@ -228,7 +245,7 @@ flowchart LR
     U["瀏覽器"]
     N["90<br/>nginx 反向代理"]
     G["98:3000<br/>Grafana"]
-    U -->|"① grafana.home.arpa<br/>DNS → 192.168.10.90"| N
+    U -->|"① grafana.liyibass.internal<br/>DNS → 192.168.10.90"| N
     N -->|"② 依 server_name<br/>轉發"| G
 ```
 
@@ -246,9 +263,9 @@ flowchart LR
 ## 驗證
 
 ```bash
-dig +short @192.168.10.90 grafana.home.arpa      # → 192.168.10.90
+dig +short @192.168.10.90 grafana.liyibass.internal      # → 192.168.10.90
 dig +short @192.168.10.90 google.com             # → 142.250.196.206（轉發成功）
-dig @192.168.10.90 nosuch.home.arpa | grep status
+dig @192.168.10.90 nosuch.liyibass.internal | grep status
                                                  # → status: NXDOMAIN（未外洩上游）
 ```
 
@@ -266,7 +283,7 @@ dig @192.168.10.90 nosuch.home.arpa | grep status
 
 | | 誰在用 | 解析什麼 | 由誰回答 |
 |---|---|---|---|
-| **①** | 使用者的瀏覽器 | `*.home.arpa` | 90 的 dnsmasq |
+| **①** | 使用者的瀏覽器 | `*.liyibass.internal` | 90 的 dnsmasq |
 | **②** | 98 上的容器之間 | `prometheus`、`grafana` | Docker 內建 DNS `127.0.0.11` |
 | **③** | 兩台機器本身 | 公網域名（`apt`、`docker pull`） | 各自的 systemd-resolved |
 
@@ -305,7 +322,7 @@ Prometheus → 目標   targets: ['192.168.10.90:9100', ...]      ← 寫死 IP
 
 原因是：**DNS 客戶端不保證「主要失敗才問次要」**。不少作業系統（含 macOS / iOS）會並行查詢，或在主要回應較慢時直接改問次要。
 
-只要有一次查詢跑到 `8.8.8.8`，`grafana.home.arpa` 就是 NXDOMAIN。症狀是**時好時壞、重試一次又好了**——屬於最難查的那一類故障。
+只要有一次查詢跑到 `8.8.8.8`，`grafana.liyibass.internal` 就是 NXDOMAIN。症狀是**時好時壞、重試一次又好了**——屬於最難查的那一類故障。
 
 正確做法：**次要留空**，或同樣填 `192.168.10.90`。公網名稱的解析交給 dnsmasq 自己往上游轉發。
 
