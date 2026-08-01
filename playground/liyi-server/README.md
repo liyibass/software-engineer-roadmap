@@ -104,13 +104,15 @@ graph TB
 
 依「爆炸半徑 ÷ 修復成本」排序：
 
-- [ ] **WiFi 密碼隔離** — `/etc/netplan/90-wifi.yaml` 有明文密碼，進 git 前必須處理
-- [ ] **修 `.97` 衝突** — 見 ADR-003
-- [ ] **SSH 加固** — 改金鑰登入、限制來源網段（對應 `infra-2-6`）
-- [ ] **設定檔納入版控** — 建立 `~/infra` repo（對應 `infra-6-3`）
-- [ ] **路徑式 → 子網域路由** — 需要區網 DNS，見 ADR-001
+- [x] **WiFi 密碼隔離** — `.gitignore` 排除，只追蹤去識別化的 `.example`
+- [x] **修 `.97` 衝突** — 見 ADR-003
+- [ ] **SSH 加固** — ufw 已限區網；**關閉密碼登入待金鑰驗證**（對應 `infra-2-6`）
+- [x] **設定檔納入版控** — `~/infra` repo，已推 GitHub private（對應 `infra-6-3`）
+- [x] **路徑式 → 子網域路由** — dnsmasq + `.liyibass.internal`，見 ADR-001
 - [ ] **90 改走有線** — 提升可靠度，同時解決 `.97` 衝突
+- [ ] **98 的資料備份** — Grafana / Prometheus volumes 目前只有一份（對應 `infra-8-1`、`infra-8-2`）
 - [ ] **TLS** — 目前 Grafana 帳密在區網上是明文（對應 `infra-4-4`）
+- [ ] **k3s** — 未來在 98 上跑，97 加入為第二節點（不要先搬監控進去）
 
 ---
 
