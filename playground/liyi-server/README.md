@@ -98,6 +98,7 @@ graph TB
 ### 📋 現況文件
 
 - [架構現況.md](架構現況.md) — 活文件，每次改動後更新
+- [grafana/](grafana/) — Dashboard 定義備份（可攜格式，Grafana 重建後也 import 得回來）
 
 ---
 
