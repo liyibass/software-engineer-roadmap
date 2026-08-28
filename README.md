@@ -20,6 +20,7 @@ graph TB
     INFRA["📕 infra<br/>自架基礎建設"]
     AWS["📒 aws<br/>雲端基礎建設"]
     SRE["📓 sre<br/>網站可靠性工程"]
+    COMFY["🎨 comfyui<br/>生成式美術"]
     EXTRA["📚 課外讀物 E-1~E-14<br/>所有書共用的延伸知識"]
 
     CS --> BASIC
@@ -39,9 +40,10 @@ graph TB
     EXTRA -.共用.-> INFRA
     EXTRA -.共用.-> AWS
     EXTRA -.共用.-> SRE
+    INFRA -.自架 GPU 主機.-> COMFY
 ```
 
-上圖：`cs`（計算機概論）是底層理論地基；`basic` 是程式入門；兩者打底後可接 `dsa`（資料結構與演算法）練效率思維、`rust`（系統級語言）深入記憶體，或往後端（csharp）、快取（cache）、自架（infra）、雲端（aws）發展；infra / aws 之後可接 sre 學「讓系統跑得可靠」。課外讀物則被所有書交叉引用。
+上圖：`cs`（計算機概論）是底層理論地基；`basic` 是程式入門；兩者打底後可接 `dsa`（資料結構與演算法）練效率思維、`rust`（系統級語言）深入記憶體，或往後端（csharp）、快取（cache）、自架（infra）、雲端（aws）發展；infra / aws 之後可接 sre 學「讓系統跑得可靠」。`comfyui` 是獨立支線（生成式美術），不需要前面任何一本書就能讀。課外讀物則被所有書交叉引用。
 
 ---
 
@@ -58,8 +60,9 @@ graph TB
 | 📕 **[infra](lessons/infra/課程大綱.md)** | 自架基礎建設 | 獨立管理 Linux 伺服器、架設服務、設網路安全、自動化與監控 | 44 | ✅ |
 | 📒 **[aws](lessons/aws/課程大綱.md)** | 雲端基礎建設 | 安全地使用 AWS、讀懂 VPC/EKS 架構圖、把 app 部署上雲、控管帳單 | 53 | ✅ |
 | 📓 **[sre](lessons/sre/課程大綱.md)** | 網站可靠性工程 | 定義 SLO、建立觀測性、設計告警、主導事故處理、為系統設計韌性 | 44 | ✅ |
+| 🎨 **[comfyui](lessons/comfyui/課程大綱.md)** | 生成式美術 | 看懂並手接 workflow、理解擴散模型與 LoRA 原理、訓練自己的 LoRA、用 ControlNet 精準控圖、把 ComfyUI 當服務接進專案 | 151 | 📝 46/151 |
 
-> 🎉 九本書的章節內容皆已完成。
+> 🎉 前九本書的章節內容皆已完成。📝 = 大綱已備、章節撰寫中（comfyui 已完成 Part 0~3）。
 
 ### 📚 課外讀物（E 系列，所有書共用）
 
@@ -90,7 +93,7 @@ programming-tutorial/
 │   │   ├── intro/
 │   │   ├── part-0/ … part-7/
 │   │   └── ...
-│   ├── cs/  dsa/  rust/  csharp/  cache/  infra/  aws/  sre/
+│   ├── cs/  dsa/  rust/  csharp/  cache/  infra/  aws/  sre/  comfyui/
 ├── 課外讀物/            # 所有書共用的延伸閱讀（E-1 ~ E-14）
 │   ├── 課程大綱.md       # 課外讀物總目錄（共用）
 │   ├── E-1-terminal/ … E-14-observability/
