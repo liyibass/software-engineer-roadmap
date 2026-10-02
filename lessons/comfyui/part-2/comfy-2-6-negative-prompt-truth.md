@@ -161,6 +161,49 @@ graph LR
 
 ---
 
+### ⚠️ CFG = 1 的模型：負面提示詞直接失效，而且「no X」會變成「要 X」
+
+把上面的核心公式代入 CFG = 1：
+
+```
+最終預測 = 預測B + 1 × (預測A − 預測B)
+        = 預測A
+```
+
+**負面那一項整個消掉了。** CFG = 1 時模型只看正面提示詞，負面寫什麼都沒有影響——ComfyUI 的 workflow
+裡常看到負面接 `ConditioningZeroOut`（把負面歸零），就是因為反正用不到。
+
+哪些模型會用 CFG = 1？**「蒸餾（distilled）」或「Turbo」版本**：為了少步數出圖（4～8 步），
+訓練時把 CFG 的效果「烤」進模型本身，推論時 CFG 必須設 1，調高反而會燒焦。
+Krea 2 Turbo、Flux 系列的蒸餾版、各種 Turbo／Lightning LoRA 都是這類。
+
+這帶出一個很違反直覺的坑：
+
+```
+你想避免日式元素，於是在「正面」提示詞寫：
+    ...a Filipino night market... no torii gates, no cherry blossoms, no lucky cats.
+
+模型讀到的是：
+    ...torii gates... cherry blossoms... lucky cats...
+```
+
+文字編碼器不懂「no」的否定語意——它只是把這幾個詞也編碼進條件裡，**模型就照著畫出來**。
+
+> ⚠️ 2026-10 實測：一段寫了「no torii gates, no cherry blossoms」的菲律賓夜市提示詞，丟給 Krea 2 的某個社群微調，
+> **16 張有 15 張冒出鳥居、櫻花或招財貓**。同一段給官方原版就少很多——微調模型對這些詞更敏感，但根本原因是寫法錯。
+
+**CFG = 1 模型的正確寫法**：
+
+| 想要 | ❌ 別這樣寫 | ✅ 改這樣寫 |
+|------|------------|------------|
+| 沒有日式元素 | `no torii, no cherry blossom` | 只描述你要的元素：`parol star lanterns, banderitas bunting` |
+| 招牌不要有字 | `no text on signs` | `blank wooden sign`、`plain glowing frame` |
+| 背景乾淨 | `no clutter` | `calm, low-detail, softly out of focus center` |
+
+**判斷原則**：先看 workflow 的 CFG。CFG > 1 才有負面提示詞可用；CFG = 1 就只能「描述你要的」，而且正面裡一個你不要的名詞都不要出現。
+
+---
+
 ## 程式碼範例
 
 把 CFG 的實際運算寫出來（這是 KSampler 每一步都在做的事）：
