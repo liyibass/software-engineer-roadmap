@@ -16,6 +16,7 @@ graph TB
     DSA["📐 dsa<br/>資料結構與演算法"]
     CSHARP["📗 csharp<br/>C# 後端開發"]
     RUST["🦀 rust<br/>Rust 程式設計"]
+    GO["🐹 go<br/>Go 程式設計"]
     CACHE["📙 cache<br/>快取完全攻略"]
     INFRA["📕 infra<br/>自架基礎建設"]
     AWS["📒 aws<br/>雲端基礎建設"]
@@ -28,6 +29,8 @@ graph TB
     CS --> RUST
     BASIC --> DSA
     BASIC --> RUST
+    CS --> GO
+    BASIC --> GO
     BASIC --> CSHARP
     BASIC --> CACHE
     BASIC --> INFRA
@@ -43,7 +46,7 @@ graph TB
     INFRA -.自架 GPU 主機.-> COMFY
 ```
 
-上圖：`cs`（計算機概論）是底層理論地基；`basic` 是程式入門；兩者打底後可接 `dsa`（資料結構與演算法）練效率思維、`rust`（系統級語言）深入記憶體，或往後端（csharp）、快取（cache）、自架（infra）、雲端（aws）發展；infra / aws 之後可接 sre 學「讓系統跑得可靠」。`comfyui` 是獨立支線（生成式美術），不需要前面任何一本書就能讀。課外讀物則被所有書交叉引用。
+上圖：`cs`（計算機概論）是底層理論地基；`basic` 是程式入門；兩者打底後可接 `dsa`（資料結構與演算法）練效率思維、`rust`（系統級語言）深入記憶體、`go`（為並行與雲端後端而生、好入門）練並行後端，或往後端（csharp）、快取（cache）、自架（infra）、雲端（aws）發展；infra / aws 之後可接 sre 學「讓系統跑得可靠」。`comfyui` 是獨立支線（生成式美術），不需要前面任何一本書就能讀。課外讀物則被所有書交叉引用。
 
 ---
 
@@ -55,6 +58,7 @@ graph TB
 | 📘 **[basic](lessons/basic/課程大綱.md)** | 全端程式入門 | 建立程式思維，用 TypeScript 從前端、後端、資料庫到部署做出完整 app | 53 | ✅ |
 | 📐 **[dsa](lessons/dsa/課程大綱.md)** | 資料結構與演算法 | 分析複雜度（Big-O）、熟悉各種資料結構與經典演算法，選對解法 | 38 | ✅ |
 | 🦀 **[rust](lessons/rust/課程大綱.md)** | Rust 程式設計 | 駕馭所有權/借用/生命週期，用 Axum + 資料庫做出高效能 Web 後端 | 52 | ✅ |
+| 🐹 **[go](lessons/go/課程大綱.md)** | Go 程式設計 | 用 interface、goroutine/channel/context、error 值處理，做出連資料庫、能並行、能優雅關機的 Go 後端服務 | 42 | 📝 27/42（Part 0–4） |
 | 📗 **[csharp](lessons/csharp/課程大綱.md)** | C# 後端開發 | 用 C# / ASP.NET Core 獨立開發、測試、部署一個完整後端 API | 56 | ✅ |
 | 📙 **[cache](lessons/cache/課程大綱.md)** | 快取完全攻略 | 看懂、設計、除錯各層快取（瀏覽器 / CDN / Redis / DB），避開經典的坑 | 30 | ✅ |
 | 📕 **[infra](lessons/infra/課程大綱.md)** | 自架基礎建設 | 獨立管理 Linux 伺服器、架設服務、設網路安全、自動化與監控 | 44 | ✅ |
