@@ -222,3 +222,4 @@ cloudflared 是一個「外面的請求能經過它進到家裡」的程式，�
 > 通道前面那一層的 WAF、mTLS、限流 → [E-10-20 邊緣防火牆（WAF）](../E-10-security/E-10-20-edge-waf.md)
 > 在邊緣用用戶端憑證限制誰能進來 → [E-10-19 憑證拆解：X.509、憑證鏈與 CSR](../E-10-security/E-10-19-x509-certificate-csr.md)
 > 一個實際用通道上線的案例 → [實戰筆記 04](../../playground/liyi-server/實戰筆記/04-兩台機器的部署分工與三個綠燈陷阱.md)
+> 在 Cloudflare 後台實際建一條通道（指令、設定檔、後台畫面）→ [E-18-2 Tunnel 實作](../E-18-cloudflare/E-18-2-tunnel.md)

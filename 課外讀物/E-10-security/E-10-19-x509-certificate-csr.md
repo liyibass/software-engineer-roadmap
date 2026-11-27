@@ -504,3 +504,4 @@ cat server.crt intermediate.crt > server-fullchain.crt
 > 雙向 TLS 與內部 CA 的觀念 → [E-10-14 mTLS 與內部 CA](./E-10-14-mtls-internal-ca.md)
 > 憑證釘扎用的就是公鑰指紋 → [E-10-7 中間人攻擊與憑證釘扎](./E-10-7-mitm.md)
 > 憑證到期與私鑰外洩後的換鑰 → [E-10-13 金鑰輪換與 KMS](./E-10-13-key-rotation-kms.md)
+> 在 Cloudflare 用對方的 CSR 簽用戶端憑證、只對 API 開 mTLS → [E-18-3 用戶端憑證與 mTLS](../E-18-cloudflare/E-18-3-client-certificate-mtls.md)

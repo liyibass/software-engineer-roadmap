@@ -282,3 +282,4 @@ flowchart LR
 > 讓源站不開任何埠、只有邊緣連得到 → [E-3-12 不開門也能對外服務：反向通道](../E-3-network/E-3-12-reverse-tunnel.md)
 > 限流的演算法與分層 → [E-10-8 Rate Limiting](./E-10-8-rate-limiting.md)
 > 閘道驗過、後端仍要做細粒度檢查 → [E-10-17 API Gateway](./E-10-17-api-gateway.md)
+> 在 Cloudflare 後台實際寫 mTLS＋IP 白名單的自訂規則與限流 → [E-18-4 WAF 自訂規則與限流](../E-18-cloudflare/E-18-4-waf-rate-limiting.md)
