@@ -162,3 +162,4 @@ graph TB
 ## 延伸閱讀
 
 > 想了解 HTTP 協定的完整內容 → [課外讀物 E-3-3：HTTP 協定詳解](./E-3-3-http-protocol.md)
+> 延伸：把一張憑證拆開來看、自己用 openssl 建 CA 簽憑證 → [課外讀物 E-10-19：憑證拆解：X.509、憑證鏈與 CSR](../E-10-security/E-10-19-x509-certificate-csr.md)

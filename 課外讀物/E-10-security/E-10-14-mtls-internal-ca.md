@@ -238,3 +238,4 @@ graph LR
 > TLS 握手與憑證驗證的基礎 → [E-3-2 HTTPS 與 TLS](../E-3-network/E-3-2-https-tls.md)
 > 憑證釘扎——把信任範圍縮到特定憑證，和內部 CA 是同一套信任模型的不同用法 → [E-10-7 HTTPS 不是萬能的：中間人攻擊與憑證釘扎](./E-10-7-mitm.md)
 > 憑證裡的私鑰也要能定期換、能緊急換 → [E-10-13 金鑰輪換與 KMS](./E-10-13-key-rotation-kms.md)
+> 延伸：用 openssl 動手建內部 CA、簽用戶端憑證 → [E-10-19 憑證拆解：X.509、憑證鏈與 CSR](./E-10-19-x509-certificate-csr.md)；mTLS 改在邊緣驗時後端要注意什麼 → [E-10-20 邊緣防火牆（WAF）](./E-10-20-edge-waf.md)

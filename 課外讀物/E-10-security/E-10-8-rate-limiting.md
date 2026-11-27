@@ -206,3 +206,4 @@ async function rateLimit(req, res, next) {
 - 是縱深防禦一環，常配 CAPTCHA、WAF、CDN。
 
 > 限流的系統保護角度 → 參見 **sre 課程** Part 8-2；fail2ban（限流防暴力破解）→ **infra 課程** Part 8-3；Redis → 快取課程 cache-5-2
+> 延伸：把限流和 WAF 規則放在邊緣、免費方案的常見限制 → [E-10-20 邊緣防火牆（WAF）](./E-10-20-edge-waf.md)
